@@ -962,4 +962,3 @@ flutter build apk --flavor prod --dart-define=FLAVOR=prod
 
 **End of Report**
 
-*This report was generated through comprehensive static code analysis of the Lykluk mobile app repository. For questions or clarifications, please refer to the specific file paths mentioned throughout this document.*
