@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "728695047638",
+    "project_id": "lykluk-467006",
+    "storage_bucket": "lykluk-467006.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:728695047638:android:df443b6e201d25414e9077",
+        "android_client_info": {
+          "package_name": "com.lykluk.lykluk"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "728695047638-8rhkgp4pljabkmkg9loafl2kbqc3ctde.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVgsQ6-9NX6tUZxXWNe3SPLWijtxQsXf4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "728695047638-8rhkgp4pljabkmkg9loafl2kbqc3ctde.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "728695047638-leeu3l8t47oduej3nnsogpm5sbefvg2r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "lykluk.com",
+                "app_store_id": "6444111490"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

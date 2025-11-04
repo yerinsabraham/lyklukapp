@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>$(APP_DISPLAY_NAME)</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>$(APP_DISPLAY_NAME)</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<!-- <string>com.googleusercontent.apps.795570603258-341c9pko716artdlijjjp7mejg197o9c</string> -->
+					<string>com.googleusercontent.apps.728695047638-leeu3l8t47oduej3nnsogpm5sbefvg2r</string>
+					<string>com.googleusercontent.apps.728695047638-k9l3svpspuce5cba4fnsk1q4g034t38t</string>
+				</array>
+			</dict>
+		</array>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>FLAVOR</key>
+		<string>$(FLAVOR)</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsArbitraryLoads</key>
+			<true/>
+		</dict>
+		<key>NSAppleMusicUsageDescription</key>
+		<string>$(PRODUCT_NAME) needs this permission for recordings</string>
+		<key>NSCameraUsageDescription</key>
+		<string>$(PRODUCT_NAME) needs to Access Camera to take picture for upload in order to verify your identity(KYC) as a user</string>
+		<key>NSFaceIDUsageDescription</key>
+		<string>Face ID Needed for Authentication</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>$(PRODUCT_NAME) need access to your location to provide you with location-based services, even when the app is in the background.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>$(PRODUCT_NAME) need access to your location while you are using the app to provide you with location-based services.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>$(PRODUCT_NAME) needs microphone access to record audio sounds for videos</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>$(PRODUCT_NAME) needs to Access Photo Library to upload pictures for verification of users identity(KYC)</string>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>fetch</string>
+			<string>remote-notification</string>
+		</array>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UIStatusBarHidden</key>
+		<false/>
+	</dict>
+</plist>

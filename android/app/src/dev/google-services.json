@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "971756828487",
+    "project_id": "lykluk-staging",
+    "storage_bucket": "lykluk-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:971756828487:android:e7ce372ebc15fe4ceb3e62",
+        "android_client_info": {
+          "package_name": "com.lykluk.lykluk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCh8B0ON1Ip0s5zDnR4a5lHFIte9azUstI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

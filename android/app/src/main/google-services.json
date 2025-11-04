@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "989199363639",
+    "project_id": "lykluk-79b75",
+    "storage_bucket": "lykluk-79b75.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:989199363639:android:6568b1cfdb42a09d78d9b2",
+        "android_client_info": {
+          "package_name": "com.lykluk.lykluk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvuauALpcJW-ancDT3J9qlbqGpq_YwNTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
