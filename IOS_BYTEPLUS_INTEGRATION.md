@@ -1,6 +1,150 @@
-# iOS Setup Guide (For MacBook User)
+# iOS Production Build & BytePlus Integration Guide
+**For: Colleague on MacBook generating signed iOS build**
 
-## ⚡ QUICK START (5 Minutes)
+---
+
+## 🚨 CRITICAL: Production Certificate Setup (MUST DO FIRST)
+
+### Before Building for App Store
+
+Your MacBook MUST have valid iOS distribution certificates. Follow these steps:
+
+#### 1. Apple Developer Account Setup
+- Ensure you have access to Lykluk's Apple Developer account
+- Account owner must grant you "Admin" or "App Manager" role
+- Go to: developer.apple.com/account
+
+#### 2. Create App Store Distribution Certificate
+
+**In Apple Developer Portal:**
+1. Navigate to: Certificates, Identifiers & Profiles
+2. Click: Certificates → "+" button
+3. Select: "Apple Distribution" (for App Store)
+4. Follow prompts to generate Certificate Signing Request (CSR) from Keychain Access on your Mac
+5. Upload CSR and download certificate
+6. Double-click downloaded certificate to install in Keychain
+
+**Verify Installation:**
+- Open Keychain Access
+- Look for: "Apple Distribution: [Your Team Name]"
+- Should have a private key underneath it
+
+#### 3. Create App Store Provisioning Profile
+
+**In Apple Developer Portal:**
+1. Go to: Profiles → "+" button
+2. Select: "App Store" distribution profile
+3. Select App ID: **lykluk.com** (production bundle ID)
+4. Select the Distribution certificate you just created
+5. Download the provisioning profile
+6. Double-click to install
+
+#### 4. Configure Xcode Signing
+
+**Open project:**
+```bash
+cd lyklukapp
+open ios/Runner.xcworkspace
+```
+
+**In Xcode:**
+1. Select "Runner" project in navigator
+2. Select "Runner" target
+3. Go to "Signing & Capabilities" tab
+4. **Production (Release):**
+   - Uncheck "Automatically manage signing"
+   - Team: Select your Apple Developer team
+   - Provisioning Profile: Select the App Store profile you created
+   - Bundle Identifier: Verify it's "lykluk.com"
+
+5. **Development (Debug) - Optional:**
+   - Can use automatic signing for testing
+   - Bundle Identifier: "com.lykluk.lyklukDev"
+
+**IMPORTANT:** Do NOT commit Xcode project file changes with your personal team ID. These settings are machine-specific.
+
+---
+
+## 📦 PRODUCTION BUILD STEPS (After Certificate Setup)
+
+### Step 1: Verify Code is Production-Ready
+
+The code is already configured for production. Verify:
+
+```bash
+# Check flavor is set to production
+grep "appFlavor = Flavor.prod" lib/flavor_config.dart
+
+# Check iOS app name
+grep "CFBundleDisplayName" ios/Runner/Info.plist | grep "Lykluk"
+
+# Verify version
+grep "version:" pubspec.yaml
+# Should show: version: 1.1.3+12
+```
+
+All should be correct already. ✅
+
+### Step 2: Clean Build
+
+```bash
+flutter clean
+cd ios
+rm -rf Pods Podfile.lock
+pod install
+cd ..
+flutter pub get
+```
+
+### Step 3: Build for App Store
+
+```bash
+flutter build ipa --release
+```
+
+**Build Output Location:**
+```
+build/ios/archive/Runner.xcarchive
+build/ios/ipa/lykluk.ipa
+```
+
+### Step 4: Upload to App Store Connect
+
+**Option A: Using Xcode (Recommended)**
+```bash
+open build/ios/archive/Runner.xcarchive
+```
+- Xcode Organizer will open
+- Click "Distribute App"
+- Select "App Store Connect"
+- Follow the prompts
+
+**Option B: Using Transporter App**
+- Open "Transporter" app (download from Mac App Store if needed)
+- Drag `build/ios/ipa/lykluk.ipa` into Transporter
+- Click "Deliver"
+
+**Option C: Command Line (Advanced)**
+```bash
+xcrun altool --upload-app --type ios --file build/ios/ipa/lykluk.ipa \
+  --username "your-apple-id@email.com" \
+  --password "app-specific-password"
+```
+
+### Step 5: Submit for Review
+
+1. Go to: appstoreconnect.apple.com
+2. Select "Lykluk" app
+3. Click "+" to create new version (1.1.3)
+4. Fill in version information:
+   - What's New: Describe new features
+   - Screenshots: Upload required screenshots
+5. Select the build you just uploaded
+6. Click "Submit for Review"
+
+---
+
+## ⚡ QUICK START (5 Minutes) - BytePlus Optional Features
 
 ### What Already Works (No Setup Needed)
 Your iOS code is **READY**. Just test it:
