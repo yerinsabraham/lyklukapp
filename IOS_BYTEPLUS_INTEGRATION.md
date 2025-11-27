@@ -1,512 +1,412 @@
-# iOS BytePlus Integration Guide
+# iOS BytePlus License Update Guide for Dimeji
 
 ## Overview
 
-This guide will help you integrate the BytePlus EffectOne SDK into the iOS version of the app, enabling video recording with filters, effects, and stickers (matching the Android version).
+This guide shows you how to update the BytePlus license file for iOS. The new license expires **December 31, 2025** (replacing the old one that expired November 30, 2025).
 
-**What you'll get:**
-- ✅ BytePlus camera with filters and effects
-- ✅ Video editing capabilities
-- ✅ Stickers and beauty effects
-- ✅ Feature parity with Android app
+**What happened on Android:**
+- Old license expired November 30, 2025
+- Downloaded new license from BytePlus (expires Dec 31, 2025)
+- Updated Android app to use new license
+- Fixed caching issue so users don't need to reinstall
 
-**Important:** This guide is based on the actual BytePlus iOS SDK v1.8.0.1 API. The code has been verified against the official sample project.
+**What you need to do on iOS:**
+- Download the same license package
+- Extract and copy the iOS license file
+- Update iOS code to reference the new license
+- Test to ensure authentication works
 
 ---
 
-## Step 1: Pull Latest Code & Clean
+## Step 1: Download License Package
+
+### 1.1 Download from BytePlus
+
+1. Go to: https://bytedance.larkoffice.com/wiki/UMxUwBZVoiZBi0kVP5FcmSXBn0e
+2. Download the file: **`fcfa54b14428eb38f4ced4ac6095984c.zip`**
+3. Save it to your Downloads folder
+
+### 1.2 Extract the ZIP
+
+```bash
+cd ~/Downloads
+unzip fcfa54b14428eb38f4ced4ac6095984c.zip
+cd fcfa54b14428eb38f4ced4ac6095984c
+```
+
+### 1.3 Navigate to iOS License
+
+```bash
+cd iOS/License
+ls -la
+```
+
+You should see **2 license files**:
+- `lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag` (Dev)
+- `lykluk_test_20251027_20251231_lykluk.com_1.8.0_472.licbag` (Prod - wrong bundle ID format)
+
+**Important:** Use the **first file** (`com.lykluk.lyklukDev`) because:
+- iOS bundle ID is: `com.lykluk.lykluk` 
+- The second file has incorrect format: `lykluk.com` (bundle ID backwards)
+- BytePlus made an error in the second filename
+
+---
+
+## Step 2: Copy License to iOS Project
+
+### 2.1 Navigate to Your iOS Project
+
+```bash
+cd ~/dev/mobile_app_v2/ios/Runner/License
+```
+
+**Note:** If the `License` folder doesn't exist yet, create it:
+```bash
+mkdir -p ~/dev/mobile_app_v2/ios/Runner/License
+```
+
+### 2.2 Copy the New License File
+
+```bash
+cp ~/Downloads/fcfa54b14428eb38f4ced4ac6095984c/iOS/License/lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag ~/dev/mobile_app_v2/ios/Runner/License/
+```
+
+### 2.3 Verify the File Was Copied
+
+```bash
+ls -la ~/dev/mobile_app_v2/ios/Runner/License/
+```
+
+You should see:
+- ✅ `lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag` (NEW - expires Dec 31)
+- ⚠️ Old license file (if present) - you can delete it
+
+### 2.4 Delete Old License (Optional)
+
+If there's an old license file with `20251130` in the name:
+```bash
+rm ~/dev/mobile_app_v2/ios/Runner/License/lykluk_test_*_20251130_*.licbag
+```
+
+---
+
+## Step 3: Update iOS Code to Use New License
+
+### 3.1 Open EffectOneModule.swift
 
 ```bash
 cd ~/dev/mobile_app_v2
-git pull origin mvp-official
-flutter clean
-cd ios
-pod install
+code ios/Runner/EffectOneModule.swift
 ```
+
+Or open it in Xcode.
+
+### 3.2 Find the `makeAuth()` Function
+
+Look for the function that loads the license (around line 30-50). It should look like:
+
+```swift
+func makeAuth() {
+    // License is in Runner/License folder (not in bundle)
+    guard let licensePath = Bundle.main.path(forResource: "OLD_LICENSE_NAME", ofType: "licbag", inDirectory: "License") else {
+        print("❌ [BytePlus] License file not found")
+        return
+    }
+    
+    print("🎬 [BytePlus] License path: \(licensePath)")
+    
+    EOLicense.checkLicense(withPath: licensePath) { result, message in
+        print("🎬 [BytePlus] License check: \(result), message: \(message ?? "none")")
+    }
+}
+```
+
+### 3.3 Update the License Filename
+
+**Change this line:**
+```swift
+guard let licensePath = Bundle.main.path(forResource: "OLD_LICENSE_NAME", ofType: "licbag", inDirectory: "License") else {
+```
+
+**To this:**
+```swift
+guard let licensePath = Bundle.main.path(forResource: "lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472", ofType: "licbag", inDirectory: "License") else {
+```
+
+**Note:** Don't include `.licbag` in the filename - the `ofType` parameter handles that.
+
+### 3.4 Save the File
+
+Press `Cmd+S` to save in Xcode or VS Code.
 
 ---
 
-## Step 2: Download BytePlus SDK
+## Step 4: Add License to Xcode Project
 
-1. Download the SDK from: https://bytedance.sg.larkoffice.com/wiki/UMxUwBZVoiZBi0kVP5FcmSXBn0e
-2. Extract the downloaded file
-3. Locate `EffectOneKit.xcframework` in the extracted folder
-4. Copy `EffectOneKit.xcframework` to `ios/` folder in the project:
+**⚠️ CRITICAL:** The license file must be added to the Xcode project, not just copied to the folder.
+
+### 4.1 Open Xcode Workspace
 
 ```bash
-# From your downloads folder
-cp -r ~/Downloads/EffecOne-iOS-Sample-V1.8.0.1/EffectOneKit.xcframework ~/dev/mobile_app_v2/ios/
+cd ~/dev/mobile_app_v2/ios
+open Runner.xcworkspace
 ```
 
-**Note:** The framework is ~200MB and is excluded from git tracking (in .gitignore).
+**Important:** Open `.xcworkspace`, NOT `.xcodeproj`
+
+### 4.2 Add License File to Xcode
+
+1. In Xcode, locate the **Runner** folder in Project Navigator (left sidebar)
+2. **Right-click** on **Runner** → **Add Files to "Runner"...**
+3. Navigate to: `ios/Runner/License/`
+4. Select: `lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag`
+5. **Check these options:**
+   - ✅ **Copy items if needed**
+   - ✅ **Target: Runner**
+   - ✅ Create folder references (NOT groups)
+6. Click **Add**
+
+### 4.3 Verify License Is Added
+
+In Xcode Project Navigator, you should see:
+```
+Runner/
+  ├── Runner/
+  │   ├── License/
+  │   │   └── lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag ✅
+  │   ├── EffectOneModule.swift
+  │   └── AppDelegate.swift
+```
+
+### 4.4 Check Target Membership
+
+1. Click on the license file in Xcode
+2. Open **File Inspector** (right sidebar, first tab)
+3. Under **Target Membership**, verify:
+   - ✅ **Runner** is checked
 
 ---
 
-## Step 3: Add SDK to Xcode Project
+## Step 5: Clean Build and Test
 
-1. Open the project in Xcode:
+### 5.1 Clean Xcode Build Cache
+
+In Xcode menu:
+1. **Product** → **Clean Build Folder** (Cmd+Shift+K)
+2. Close Xcode
+3. Delete derived data:
    ```bash
-   cd ios
-   open Runner.xcworkspace
+   rm -rf ~/Library/Developer/Xcode/DerivedData
    ```
 
-2. In Xcode's Project Navigator:
-   - Select the **Runner** project (top item)
-   - Select the **Runner** target
-   - Go to **General** tab
-   - Scroll to **Frameworks, Libraries, and Embedded Content**
+### 5.2 Clean Flutter Build
 
-3. Click the **+** button
-
-4. Click **Add Other** → **Add Files...**
-
-5. Navigate to your project's `ios/` folder
-
-6. Select `EffectOneKit.xcframework`
-
-7. **CRITICAL:** In the "Embed" column, select **"Embed & Sign"** (not "Do Not Embed")
-
-8. Click **Add**
-
-9. Verify the framework appears in the list with "Embed & Sign"
-
----
-
-## Step 4: Update iOS Code
-
-### 4.1 Update `ios/Runner/BytePlusHelper.swift`
-
-**⚠️ IMPORTANT:** Replace the ENTIRE file content with this correct implementation:
-
-```swift
-import UIKit
-import Foundation
-import Photos
-import AVFoundation
-import EffectOneKit  // BytePlus SDK
-
-class BytePlusHelper: NSObject {
-    
-    // MARK: - Properties
-    private var pendingResult: FlutterResult?
-    private var presentingViewController: UIViewController?
-    private var isAuthSucceeded: Bool = false
-    
-    // MARK: - Singleton
-    static let shared = BytePlusHelper()
-    
-    private override init() {
-        super.init()
-        print("🎬 [iOS BytePlus] Helper initialized")
-    }
-    
-    // MARK: - SDK Initialization
-    func initializeSDK() {
-        print("🎬 [iOS BytePlus] Initializing SDK...")
-        
-        // License file path
-        guard let licensePath = Bundle.main.path(forResource: "com.volcengine.effectone.inhouse", ofType: "licbag", inDirectory: "License") else {
-            print("🎬 [iOS BytePlus] ERROR: License file not found")
-            return
-        }
-        
-        // Authenticate
-        EOLicense.checkLicense(withPath: licensePath) { [weak self] success, errMsg in
-            if !success {
-                print("🎬 [iOS BytePlus] Authentication failed: \(errMsg)")
-            } else {
-                print("🎬 [iOS BytePlus] Authentication successful, initializing resources...")
-                self?.isAuthSucceeded = true
-                
-                // Initialize SDK and resources
-                EOSDK.initSDK {
-                    // Set resource paths
-                    EOSDK.setResourceBaseDir(EOSDK.getEODocumentRootDir() + "/download")
-                    
-                    // Get local bundle
-                    if let bundlePath = Bundle.main.path(forResource: "EOLocalResources", ofType: "bundle"),
-                       let bundle = Bundle(path: bundlePath) {
-                        EOSDK.setResourceDefaultBuiltInConfig(EOSDK.defaultPanelConfigDir(bundle.bundlePath))
-                        EOSDK.setBuiltInResourceDir(EOSDK.defaultResourceDir(bundle.bundlePath))
-                    }
-                    
-                    // Enable remote config
-                    EOSDK.useRemoteConfig(true, useRemoteResource: true)
-                    
-                    print("🎬 [iOS BytePlus] SDK initialization complete")
-                }
-            }
-        }
-    }
-    
-    // MARK: - Start Recorder (Camera)
-    func startRecorder(from viewController: UIViewController, result: @escaping FlutterResult) {
-        print("🎬 [iOS BytePlus] Starting recorder (camera)...")
-        
-        guard isAuthSucceeded else {
-            print("🎬 [iOS BytePlus] ERROR: SDK not authenticated")
-            result(FlutterError(code: "NOT_AUTHENTICATED", message: "BytePlus SDK not authenticated", details: nil))
-            return
-        }
-        
-        self.pendingResult = result
-        self.presentingViewController = viewController
-        
-        // Create recorder config
-        let config = EORecorderConfig { initializer in
-            initializer.configRecorderViewController { recorderVCInitializer in
-                // Configure recorder settings here if needed
-                // Example: recorderVCInitializer.musicBarHidden = true
-            }
-        }
-        
-        // Start recorder
-        EORecorderViewController.startRecorder(with: config, presenter: viewController, delegate: self) { [weak self] error in
-            if let err = error as? NSError {
-                print("🎬 [iOS BytePlus] Recorder error: \(err)")
-                self?.pendingResult?(FlutterError(
-                    code: "RECORDER_ERROR",
-                    message: "Failed to start recorder: \(err.localizedDescription)",
-                    details: nil
-                ))
-                self?.cleanup()
-            }
-        }
-    }
-    
-    // MARK: - Start Editor from Album (Gallery)
-    func startEditorFromAlbum(from viewController: UIViewController, result: @escaping FlutterResult) {
-        print("🎬 [iOS BytePlus] Starting editor from album...")
-        
-        guard isAuthSucceeded else {
-            print("🎬 [iOS BytePlus] ERROR: SDK not authenticated")
-            result(FlutterError(code: "NOT_AUTHENTICATED", message: "BytePlus SDK not authenticated", details: nil))
-            return
-        }
-        
-        self.pendingResult = result
-        self.presentingViewController = viewController
-        
-        // Use BytePlus resource picker to select video from album
-        let resourcePicker = EOResourcePicker()
-        resourcePicker.pickResourcesFromRecorder { [weak self] resources, error, cancel in
-            guard let self = self else { return }
-            
-            if cancel {
-                print("🎬 [iOS BytePlus] User cancelled album picker")
-                self.pendingResult?(nil)
-                self.cleanup()
-                return
-            }
-            
-            if let err = error as? NSError {
-                print("🎬 [iOS BytePlus] Album picker error: \(err)")
-                self.pendingResult?(FlutterError(
-                    code: "PICKER_ERROR",
-                    message: "Failed to pick video: \(err.localizedDescription)",
-                    details: nil
-                ))
-                self.cleanup()
-                return
-            }
-            
-            guard !resources.isEmpty, let resource = resources.first else {
-                print("🎬 [iOS BytePlus] No resources selected")
-                self.pendingResult?(nil)
-                self.cleanup()
-                return
-            }
-            
-            // Open editor with selected video
-            self.openEditor(with: [resource], from: viewController)
-        }
-    }
-    
-    // MARK: - Private Methods
-    
-    private func openEditor(with resources: [EOResource], from viewController: UIViewController) {
-        let sceneConfig = EOEditorSceneConfig()
-        sceneConfig.resourceList = resources
-        
-        let config = EOEditorConfig { initializer in
-            // Configure editor settings here if needed
-        }
-        
-        EOEditorViewController.startEditor(with: config, sceneConfig: sceneConfig, presenter: viewController, delegate: self) { [weak self] error in
-            if let err = error as? NSError {
-                print("🎬 [iOS BytePlus] Editor error: \(err)")
-                self?.pendingResult?(FlutterError(
-                    code: "EDITOR_ERROR",
-                    message: "Failed to start editor: \(err.localizedDescription)",
-                    details: nil
-                ))
-                self?.cleanup()
-            }
-        }
-    }
-    
-    private func cleanup() {
-        self.pendingResult = nil
-        self.presentingViewController = nil
-    }
-}
-
-// MARK: - EORecorderViewControllerDelegate
-
-extension BytePlusHelper: EORecorderViewControllerDelegate {
-    
-    func recorderViewController(_ recorderViewController: EORecorderViewController, didFinishRecordingMediaWith info: EORecordInfo) {
-        print("🎬 [iOS BytePlus] Recording finished")
-        
-        // Pause preview
-        recorderViewController.pausePreview()
-        
-        // Open editor with recorded video
-        guard let viewController = presentingViewController else { return }
-        
-        let resource = EOResource(type: .video)
-        resource.path = info.outputPath
-        
-        openEditor(with: [resource], from: viewController)
-    }
-    
-    func recorderViewControllerDidTapAlbum(_ recorderViewController: EORecorderViewController) {
-        print("🎬 [iOS BytePlus] User tapped album from recorder")
-        // This is called when user taps album button within recorder
-        // We can handle it here if needed
-    }
-}
-
-// MARK: - EOEditorViewControllerDelegate
-
-extension BytePlusHelper: EOEditorViewControllerDelegate {
-    
-    func editorViewController(_ editorViewController: EOEditorViewController, didFinishExportingMediaWith info: EOExportInfo) {
-        print("🎬 [iOS BytePlus] Export finished: \(info.outputPath)")
-        
-        // Dismiss editor
-        editorViewController.dismiss(animated: true) { [weak self] in
-            // Return video path to Flutter
-            self?.pendingResult?(info.outputPath)
-            self?.cleanup()
-        }
-    }
-    
-    func editorViewControllerDidCancel(_ editorViewController: EOEditorViewController) {
-        print("🎬 [iOS BytePlus] User cancelled editor")
-        
-        editorViewController.dismiss(animated: true) { [weak self] in
-            self?.pendingResult?(nil)
-            self?.cleanup()
-        }
-    }
-}
+```bash
+cd ~/dev/mobile_app_v2
+flutter clean
+flutter pub get
 ```
 
-### 4.2 Update `ios/Runner/AppDelegate.swift`
-
-Add SDK initialization in `application(_:didFinishLaunchingWithOptions:)`:
-
-```swift
-import UIKit
-import Flutter
-
-@UIApplicationMain
-@objc class AppDelegate: FlutterAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    
-    // ... existing code ...
-    
-    // Initialize BytePlus SDK
-    BytePlusHelper.shared.initializeSDK()
-    
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-}
-```
-
----
-
-## Step 5: Build and Test
-
-### 5.1 Clean Build
+### 5.3 Reinstall Pods
 
 ```bash
 cd ios
-rm -rf build
-cd ..
-flutter clean
-flutter pub get
-cd ios
+rm -rf Pods Podfile.lock
 pod install
 ```
 
-### 5.2 Build for iPhone
+### 5.4 Build and Run in Release Mode
 
-**⚠️ CRITICAL:** BytePlus SDK has poor performance in debug mode. Always test in **release mode**:
+**⚠️ IMPORTANT:** Always test BytePlus in release mode (debug mode is slow):
 
 ```bash
-flutter run --release
+cd ~/dev/mobile_app_v2
+flutter run --release -d <your-iphone-id>
 ```
 
-**Note:** You MUST test on a real iPhone (not simulator) as the camera is required.
+Replace `<your-iphone-id>` with your iPhone's device ID (run `flutter devices` to see it).
 
-### 5.3 Test Checklist
+---
 
-Open the app on your iPhone and test:
+## Step 6: Verify License Is Working
 
-- [ ] **Camera**: Tap the + button → Should open BytePlus camera (NOT native iOS camera)
-- [ ] **Filters**: Check if filters tab is visible and working
-- [ ] **Effects**: Check if effects tab is visible and working
-- [ ] **Stickers**: Check if stickers tab is visible and working
-- [ ] **Record**: Record a video with effects applied
-- [ ] **Editor**: After recording, editor should open automatically
-- [ ] **Export**: Tap done/export → Video should save and return to app
-- [ ] **Gallery**: Try opening from gallery → Should open BytePlus picker
-- [ ] **Performance**: Should be smooth in release mode
+### 6.1 Check Xcode Console Logs
+
+When the app launches, look for these logs in Xcode console:
+
+**✅ SUCCESS:**
+```
+🎬 [BytePlus] License path: /path/to/lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag
+🎬 [BytePlus] License check: true, message: Success
+```
+
+**❌ FAILURE (old license expired):**
+```
+🎬 [BytePlus] License check: false, message: License expired
+```
+
+**❌ FAILURE (file not found):**
+```
+❌ [BytePlus] License file not found
+```
+
+### 6.2 Test BytePlus Features
+
+1. Open the app on your iPhone
+2. Tap the **+** button to create a post
+3. The BytePlus camera should open (not native iOS camera)
+4. Check if filters/effects are available
+5. Record a video
+6. Video should save and upload successfully
+
+**If you see "No authentication, please contact sales":**
+- License file is not being loaded
+- Check Xcode console for error messages
+- Verify the license filename matches exactly in `makeAuth()`
+
+---
+
+## Comparison: Android vs iOS License Update
+
+| Step | Android | iOS |
+|------|---------|-----|
+| **Download** | Same ZIP file | Same ZIP file |
+| **License Location** | `android/app/src/main/assets/` | `ios/Runner/License/` |
+| **License File Used** | `lykluk_test_20251027_20251231_com.lykluk.lykluk_1.8.0_472.licbag` | `lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag` |
+| **Code Update** | `EffectOneApp.kt` line 17 | `EffectOneModule.swift` `makeAuth()` function |
+| **Build System** | Gradle (auto-includes assets) | Xcode (must manually add to project) |
+| **Caching Issue** | Yes - needed force-delete logic | No - iOS doesn't cache license |
+| **Expiry Date** | Dec 31, 2025 | Dec 31, 2025 |
+
+**Key Differences:**
+- **Android:** License in `assets/` folder, automatically bundled in APK
+- **iOS:** License in `Runner/License/`, must be added to Xcode project manually
+- **Android:** Had caching bug where old license wasn't replaced - fixed with force-delete
+- **iOS:** No caching issue (license always read from bundle)
 
 ---
 
 ## Troubleshooting
 
-### "Module 'EffectOneKit' not found"
+### "License file not found" in Xcode Console
 
-**Cause:** Framework not properly embedded in Xcode.
-
-**Solution:**
-1. Open `ios/Runner.xcworkspace` in Xcode
-2. Select Runner project → Runner target → General tab
-3. Scroll to "Frameworks, Libraries, and Embedded Content"
-4. Find EffectOneKit.xcframework
-5. Change "Embed" column to **"Embed & Sign"**
-6. Clean build: Product → Clean Build Folder (Cmd+Shift+K)
-7. Rebuild
-
-### "Cannot find 'EOSDK' / 'EOLicense' in scope"
-
-**Cause:** Missing import statement.
+**Cause:** File not added to Xcode project or wrong path.
 
 **Solution:**
-- Make sure `import EffectOneKit` is at the top of BytePlusHelper.swift
-- Clean and rebuild
+1. Check if file exists: `ls ~/dev/mobile_app_v2/ios/Runner/License/*.licbag`
+2. In Xcode, verify file appears in Project Navigator under `Runner/License/`
+3. Check Target Membership (file inspector, right sidebar) - Runner should be checked
+4. Verify filename in `makeAuth()` matches exactly (case-sensitive, no `.licbag` extension)
 
-### "License file not found"
+### "License check: false, message: License expired"
 
-**Cause:** License file missing or wrong path.
-
-**Solution:**
-- Check if `ios/Runner/License/com.volcengine.effectone.inhouse.licbag` exists
-- Verify the file is added to Xcode project
-- Check the path in `BytePlusHelper.swift` matches your actual file name
-
-### App crashes on launch
-
-**Cause:** Usually license or resource path issues.
+**Cause:** Using old license file or wrong license file.
 
 **Solution:**
-1. Check Xcode console for error messages (look for 🎬 emoji logs)
-2. Verify license file exists
-3. Verify EOLocalResources.bundle exists in project
-4. Try clean build
+1. Check which license file is in the folder: `ls -la ~/dev/mobile_app_v2/ios/Runner/License/`
+2. Verify it has `20251231` in the filename (NOT `20251130`)
+3. Delete old license: `rm ~/dev/mobile_app_v2/ios/Runner/License/*20251130*.licbag`
+4. Clean build and try again
 
-### Camera opens but no filters/effects
+### "License check: false, message: Bundle ID mismatch"
 
-**Cause:** SDK not fully initialized or resources not loaded.
-
-**Solution:**
-1. Check Xcode console for "SDK initialization complete" message
-2. Verify EOLocalResources.bundle is properly added to Xcode
-3. Check internet connection (SDK may download additional resources)
-
-### Very slow/laggy performance
-
-**Cause:** Running in debug mode.
+**Cause:** Using wrong license file for bundle ID.
 
 **Solution:**
-- **ALWAYS** test in release mode: `flutter run --release`
-- Debug mode is 10-100x slower with video processing
-- Release mode is required for accurate performance testing
+- iOS bundle ID is: `com.lykluk.lykluk`
+- Use license with: `com.lykluk.lyklukDev` in filename (BytePlus uses "Dev" suffix)
+- Do NOT use: `lykluk.com` (reversed format - wrong file from BytePlus)
+
+### App crashes on launch after license update
+
+**Cause:** Old build cache or corrupted derived data.
+
+**Solution:**
+```bash
+# Clean everything
+cd ~/dev/mobile_app_v2
+flutter clean
+rm -rf ios/Pods ios/Podfile.lock
+rm -rf ~/Library/Developer/Xcode/DerivedData
+
+# Rebuild
+cd ios
+pod install
+cd ..
+flutter run --release -d <your-iphone-id>
+```
+
+### "No authentication, please contact sales" error
+
+**Cause:** License not loading or expired.
+
+**Solution:**
+1. Check Xcode console for license check result
+2. Verify license file is added to Xcode project
+3. Verify `makeAuth()` has correct filename
+4. Check license expiry date: Should be Dec 31, 2025
+5. Try clean build (see above)
 
 ---
 
-## Verification Script
+## Quick Reference
 
-Run this to verify all files are in place:
+**License filename for iOS:**
+```
+lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag
+```
 
+**License location:**
+```
+~/dev/mobile_app_v2/ios/Runner/License/
+```
+
+**Code to update:**
+```swift
+// In EffectOneModule.swift, makeAuth() function:
+guard let licensePath = Bundle.main.path(
+    forResource: "lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472", 
+    ofType: "licbag", 
+    inDirectory: "License"
+) else {
+    print("❌ [BytePlus] License file not found")
+    return
+}
+```
+
+**Test commands:**
 ```bash
-#!/bin/bash
-echo "🔍 Verifying BytePlus iOS Setup..."
+# Clean build
+cd ~/dev/mobile_app_v2
+flutter clean
+cd ios
+rm -rf Pods Podfile.lock
+pod install
+cd ..
 
-# Check framework
-if [ -d "ios/EffectOneKit.xcframework" ]; then
-    echo "✅ EffectOneKit.xcframework found"
-else
-    echo "❌ EffectOneKit.xcframework NOT found - Download from BytePlus"
-fi
-
-# Check resources
-if [ -d "ios/EOLocalResources.bundle" ]; then
-    echo "✅ EOLocalResources.bundle found"
-else
-    echo "❌ EOLocalResources.bundle NOT found"
-fi
-
-# Check BytePlusHelper.swift
-if grep -q "import EffectOneKit" ios/Runner/BytePlusHelper.swift 2>/dev/null; then
-    echo "✅ BytePlusHelper.swift has BytePlus import"
-else
-    echo "❌ BytePlusHelper.swift missing BytePlus import"
-fi
-
-# Check if using BytePlus recorder
-if grep -q "EORecorderViewController" ios/Runner/BytePlusHelper.swift 2>/dev/null; then
-    echo "✅ Using BytePlus recorder (not native camera)"
-else
-    echo "❌ Still using native camera (UIImagePickerController)"
-fi
-
-echo ""
-echo "📝 Next steps:"
-echo "1. If framework not found: Download from https://bytedance.sg.larkoffice.com/wiki/UMxUwBZVoiZBi0kVP5FcmSXBn0e"
-echo "2. Add framework to Xcode with 'Embed & Sign'"
-echo "3. Update BytePlusHelper.swift with provided code"
-echo "4. Build in release mode: flutter run --release"
+# Run in release mode
+flutter run --release -d <your-iphone-id>
 ```
 
 ---
 
-## Comparison with Android
+## Success Checklist
 
-| Feature | Android | iOS (After Integration) |
-|---------|---------|------------------------|
-| Camera | BytePlus EORecorder | BytePlus EORecorderViewController |
-| Filters | ✅ Available | ✅ Available |
-| Effects | ✅ Available | ✅ Available |
-| Stickers | ✅ Available | ✅ Available |
-| Beauty | ✅ Available | ✅ Available |
-| Editor | BytePlus EOVideoEditor | BytePlus EOEditorViewController |
-| Gallery Picker | BytePlus | BytePlus EOResourcePicker |
+Before considering the license update complete, verify:
 
-After completing this guide, iOS and Android apps should have **identical** BytePlus features.
+- [ ] Downloaded `fcfa54b14428eb38f4ced4ac6095984c.zip` from BytePlus
+- [ ] Extracted and found iOS license file
+- [ ] Copied license to `ios/Runner/License/` folder
+- [ ] Added license to Xcode project with Target Membership = Runner
+- [ ] Updated `makeAuth()` in `EffectOneModule.swift` with new filename
+- [ ] Clean build completed without errors
+- [ ] Xcode console shows: "License check: true, message: Success"
+- [ ] BytePlus camera opens (not native iOS camera)
+- [ ] Filters and effects are available
+- [ ] Video recording and upload works
+- [ ] No "No authentication" error
 
----
-
-## Important Notes
-
-1. **Release Mode Required**: BytePlus SDK has poor debug performance. Always test with `flutter run --release`.
-
-2. **Real Device Required**: Simulator doesn't support camera. Must test on actual iPhone.
-
-3. **SDK Not in Git**: The EffectOneKit.xcframework (~200MB) is excluded from git via .gitignore. Each developer must download it separately.
-
-4. **License File**: Make sure you have the correct license file for your app. The sample uses `com.volcengine.effectone.inhouse.licbag`.
-
-5. **Internet Required**: First launch may download additional resources from BytePlus servers.
-
-6. **iOS Version**: BytePlus SDK requires iOS 11.0 or later.
+**When all checked ✅, license update is complete!**
 
 ---
 
@@ -514,9 +414,9 @@ After completing this guide, iOS and Android apps should have **identical** Byte
 
 If you encounter issues:
 1. Check Xcode console for 🎬 emoji logs
-2. Verify all files are in correct locations
-3. Make sure framework is "Embed & Sign" in Xcode
-4. Always test in release mode on real iPhone
-5. Check that license file matches your app bundle ID
+2. Verify license file location and Target Membership in Xcode
+3. Check `makeAuth()` function has correct filename
+4. Try clean build (delete DerivedData and Pods)
+5. Test in release mode (NOT debug mode)
 
-**Reference:** This implementation is based on official BytePlus iOS Sample v1.8.0.1
+**Remember:** iOS license expires **December 31, 2025** - mark your calendar to update it again before then!
