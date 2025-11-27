@@ -179,7 +179,3 @@ Please provide:
 This is blocking our production deployment. Any urgent assistance would be greatly appreciated.
 
 ---
-
-**Repository:** https://github.com/lyklukdigital/mobile_app_v2  
-**Branch:** mvp-official  
-**Contact:** [Your contact information]
