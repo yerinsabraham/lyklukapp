@@ -1,301 +1,185 @@
-# BytePlus EffectOne SDK - Export Callback Issue
+# BytePlus EffectOne SDK Support Request
 
-**Date:** November 27, 2025  
-**SDK Version:** EffectOne v1.8.0  
-**Platform:** Android 14 (API 34), Kotlin  
-**App:** Lykluk (Flutter hybrid app)  
-**Severity:** CRITICAL - Blocking Production Release
+## Issue: Cannot Get Exported Video File Path After Editing
+
+### Current Situation
+
+We are integrating BytePlus EffectOne SDK into our Android Flutter application for video editing functionality. The editor works perfectly, but **we cannot retrieve the exported video file path after the user completes editing and clicks "Next"**.
+
+### SDK Version Confusion
+
+**This is a critical issue we need clarification on:**
+
+We have received multiple SDK versions from BytePlus, and the versioning is extremely confusing:
+
+1. **Initial SDK:** Version 1.6.0 (Maven dependency: `com.volcengine.effectone:editor-ui:1.6.0`)
+2. **Downloaded SDK Folder:** `EffectOne-1.8.0-Android-20250527-all` (claims to be v1.8.0)
+3. **Version Mismatch:** The downloaded folder says 1.8.0, but we're not sure if this is compatible with the Maven 1.6.0 we're using
+
+**PLEASE CLARIFY:**
+- What is the actual current stable version number?
+- If you update to a new version, how do we know? (Is there a changelog or notification?)
+- Should we use Maven dependencies or the downloaded SDK folders?
+- When you say "version 1.8.0", does that mean we need to stop using 1.6.0 from Maven?
+
+This version confusion is causing significant delays in our development.
 
 ---
 
-## Issue Summary
+## Technical Problem Details
 
-The `ActivityCollector.onExportDone()` callback is **never invoked** after video export completes in `EditorMainActivity`, causing the app to restart and lose the exported video path. This prevents users from uploading their edited videos.
+### Current Implementation (SDK v1.6.0)
+
+We have successfully integrated:
+- ✅ SDK Authentication (EO_AUTH_SUCCESS)
+- ✅ Video Recording
+- ✅ Video Editing UI opens correctly
+- ✅ User can edit videos with all effects
+- ✅ Export progress shows 100% completion
+- ✅ Our custom `ExportActivity` launches via intent-filter `com.volcengine.effectone.Launch.EOExport`
+
+### The Problem
+
+**After the user clicks "Next" and export reaches 100%:**
+1. BytePlus successfully exports the video file somewhere on the device
+2. Our `ExportActivity` is launched (via the intent-filter)
+3. **We receive NO file path in any intent extra, callback, or parameter**
+4. We cannot find the video file to upload to our backend server
+
+### Code Implementation
+
+#### ExportActivity Registration (AndroidManifest.xml)
+```xml
+<activity
+    android:name=".ExportActivity"
+    android:exported="true"
+    android:launchMode="singleTask">
+    <intent-filter>
+        <action android:name="com.volcengine.effectone.Launch.EOExport" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+</activity>
+```
+
+#### ExportActivity Implementation (Kotlin)
+```kotlin
+class ExportActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Problem: How do we get the exported video path here?
+        val videoPath = intent?.getStringExtra("video_path")  // Always null
+        val outputPath = intent?.getStringExtra("outputPath")  // Always null
+        val filePath = intent?.getStringExtra("file_path")    // Always null
+        
+        // We have tried checking intent extras, intent data URI, everything is null
+        Log.d("ExportActivity", "Video path: $videoPath")  // Logs: "Video path: null"
+        
+        // Without the path, we cannot proceed with upload
+        ActivityCollector.onExportDone("") // Empty string because we have no path!
+    }
+}
+```
+
+#### What We've Tried
+
+1. **Checked all intent extras:**
+   - `video_path`, `outputPath`, `file_path`, `export_path`, `output`, `path`
+   - All return `null`
+
+2. **Checked intent data URI:**
+   ```kotlin
+   intent?.data?.path // Also null
+   ```
+
+3. **Looked at the Export SDK documentation (BYTEPLUS EXPORT.md):**
+   - Found `EOExportManager` with `exportVideo()` and `IEOExportListener`
+   - **But these classes don't exist in SDK v1.6.0!**
+   - Are they only available in v1.8.0?
+
+4. **Attempted to search for the file manually:**
+   - This is unreliable and could find wrong videos
+   - We need BytePlus to give us the correct path
+
+### What We Need
+
+**Please provide clear instructions on how to:**
+
+1. **Get the exported video file path after editing completes**
+   - Which intent extra key should we check?
+   - Or should we use a callback listener?
+   - Or do we need to use `EOExportManager` API (and if so, which SDK version)?
+
+2. **Clarify the SDK version situation:**
+   - Are we supposed to migrate from 1.6.0 to 1.8.0?
+   - If yes, is there a migration guide?
+   - Why does the exported SDK folder say 1.8.0 but Maven still uses 1.6.0?
+
+3. **Provide complete export flow documentation:**
+   - Step-by-step: Editor → Export → Get file path → Return to app
+   - Code examples for Android/Kotlin
+   - Which callbacks/listeners to implement
 
 ---
 
 ## Expected Behavior
 
-1. User edits video in `EditorMainActivity`
-2. User taps export button
-3. Export completes
-4. `ActivityCollector.onExportDone(outputPath)` is called with the exported video path
-5. App navigates to upload page with the video
+After the user finishes editing and clicks "Next":
+1. BytePlus should export the video
+2. BytePlus should provide the exported video file path to our app
+3. We can then upload this video to our backend
 
 ---
 
-## Actual Behavior
+## Current Behavior
 
-1. User edits video in `EditorMainActivity`
-2. User taps export button
-3. `EditorMainActivity` finishes immediately
-4. `ActivityCollector.onExportDone()` is **NEVER called**
-5. MainActivity input channel breaks: `Channel is unrecoverably broken and will be disposed!`
-6. App restarts completely
-7. Exported video path is lost
+After the user finishes editing and clicks "Next":
+1. BytePlus exports the video successfully ✅
+2. Our `ExportActivity` launches ✅
+3. **We receive no file path** ❌
+4. Cannot proceed with upload ❌
 
 ---
 
-## LogCat Evidence
+## Environment
 
-```
-11-27 09:44:31.843 E InputDispatcher: channel '937f7db com.lykluk.lykluk/com.volcengine.effectone.editorui.EditorMainActivity (server)' ~ Channel is unrecoverably broken and will be disposed!
-
-11-27 09:44:31.845 E InputDispatcher: channel 'e057f4c com.lykluk.lykluk/com.lykluk.lykluk.MainActivity (server)' ~ Channel is unrecoverably broken and will be disposed!
-```
-
-**NO logs showing:** `"onExportDone called with path"` after export completes
-
----
-
-## Implementation Details
-
-### How We Launch the Editor
-
-```kotlin
-// StartEditorFinishImpl in EOQuickInitHelper.kt
-class StartEditorFinishImpl : IAlbumFinish {
-    override suspend fun finishAction(
-        activity: Activity, 
-        mediaList: List<IMaterialItem>, 
-        albumConfig: AlbumConfig
-    ) {
-        EditorMainActivity.startEditorActivityFromAlbum(activity, mediaList.map {
-            MediaItem(
-                path = it.path,
-                type = if (it.isVideo()) MediaType.VIDEO else MediaType.IMAGE,
-                duration = if (it.isVideo()) it.duration else 3000
-            )
-        } as ArrayList<MediaItem>)
-
-        if (!activity.isFinishing) {
-            activity.finish()
-        }
-    }
-}
-```
-
-### ActivityCollector Implementation
-
-```kotlin
-// ActivityCollector.kt
-object ActivityCollector {
-    const val PATH_RESULT_CODE = 10086
-    const val PATH_RESULT_KEY = "video_path"
-
-    var editorActivityRef: WeakReference<Activity>? = null
-    var albumActivityRef: WeakReference<Activity>? = null
-    var recordActivityRef: WeakReference<Activity>? = null
-
-    fun onExportDone(outputPath: String) {
-        android.util.Log.d("ActivityCollector", "🎬 onExportDone called with path: $outputPath")
-        
-        // Send path to Flutter BEFORE finishing activities
-        MainActivity.sendVideoPathToFlutter(outputPath)
-        
-        // Then finish BytePlus activities
-        editorActivityRef?.get()?.let { activity ->
-            if (!activity.isFinishing) {
-                activity.finish()
-            }
-        }
-        albumActivityRef?.get()?.let { activity ->
-            if (!activity.isFinishing) {
-                activity.finish()
-            }
-        }
-        recordActivityRef?.get()?.let { activity ->
-            if (!activity.isFinishing) {
-                activity.finish()
-            }
-        }
-        
-        // Clear references
-        editorActivityRef = null
-        albumActivityRef = null
-        recordActivityRef = null
-    }
-}
-```
-
-### Activity Lifecycle Tracking
-
-```kotlin
-// EOQuickInitHelper.kt - initApplication()
-application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-        when (activity) {
-            is EditorMainActivity -> {
-                ActivityCollector.editorActivityRef = WeakReference(activity)
-                android.util.Log.d("EOQuickInitHelper", "🎬 EditorMainActivity created")
-            }
-            is EORecordActivity -> {
-                ActivityCollector.recordActivityRef = WeakReference(activity)
-                android.util.Log.d("EOQuickInitHelper", "🎬 EORecordActivity created")
-            }
-            is LocalAlbumActivity -> {
-                ActivityCollector.albumActivityRef = WeakReference(activity)
-                android.util.Log.d("EOQuickInitHelper", "🎬 LocalAlbumActivity created")
-            }
-        }
-    }
-
-    override fun onActivityDestroyed(activity: Activity) {
-        when (activity) {
-            is EditorMainActivity -> {
-                android.util.Log.d("EOQuickInitHelper", "🎬 EditorMainActivity destroyed")
-                // Export callback should have been called before this
-            }
-        }
-    }
-})
-```
-
-### AndroidManifest.xml
-
-```xml
-<activity
-    android:name=".MainActivity"
-    android:exported="true"
-    android:launchMode="singleTask"
-    android:taskAffinity=""
-    android:theme="@style/LaunchTheme"
-    android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-    android:hardwareAccelerated="true"
-    android:windowSoftInputMode="adjustResize">
-```
+- **SDK Name:** BytePlus EffectOne SDK
+- **SDK Version:** 1.6.0 (Maven) or 1.8.0 (Downloaded folder) - **Please clarify!**
+- **Platform:** Android (Kotlin)
+- **Framework:** Flutter
+- **Build Configuration:**
+  ```gradle
+  val effectOneVersion = "1.6.0"
+  api("com.volcengine.effectone:editor-ui:${effectOneVersion}")
+  api("com.volcengine.effectone:recorder-ui:${effectOneVersion}")
+  api("com.volcengine.effectone:base-resource:${effectOneVersion}")
+  ```
 
 ---
 
-## Authentication Status
+## Request for BytePlus Team
 
-✅ **Authentication is working correctly:**
+Please provide:
 
-```
-11-27 09:43:58.123 D EOQuickInitHelper: 🔐 License path: /data/user/0/com.lykluk.lykluk/app_flutter/lykluk_test_20251027_20251231_com.lykluk.lykluk_1.8.0_472.licbag
-11-27 09:43:58.123 D EOQuickInitHelper: 🔐 License file exists: true
-11-27 09:43:58.124 D EOQuickInitHelper: 🔐 License copied successfully
-11-27 09:43:58.857 D EOQuickInitHelper: 🔐 Auth result code: EO_AUTH_SUCCESS
-11-27 09:43:58.857 D EOQuickInitHelper: ✅ BytePlus SDK authorized successfully!
-```
-
-**License Details:**
-- File: `lykluk_test_20251027_20251231_com.lykluk.lykluk_1.8.0_472.licbag`
-- Expiration: December 31, 2025
-- Status: Valid and working
-
----
-
-## What We've Tried
-
-### ✅ Attempts That Worked
-1. Authentication is successful (EO_AUTH_SUCCESS)
-2. License file is valid and properly loaded
-3. Activity lifecycle callbacks are registered and tracking activities
-4. Changed MainActivity launchMode to `singleTask` to prevent destruction
-5. Implemented `ActivityCollector.onExportDone()` to send result BEFORE finishing activities
-
-### ❌ Attempts That Failed
-1. **EditorConfig.finishAction** - This class doesn't exist in the SDK
-2. **EffectOneSdk.exportCallback** - This property doesn't exist in the SDK
-3. **EditorWrapperActivity with onActivityResult** - Never receives result because `startEditorActivityFromAlbum` uses `startActivity` instead of `startActivityForResult`
-4. **Intent extras monitoring** - `activity.intent?.getStringExtra("outputPath")` returns null
-5. **Export activity detection** - Can detect Export activity creation but no way to get the path
-
----
-
-## Critical Questions for BytePlus Support
-
-### 1. Export Callback API
-**What is the correct API to receive the exported video path after EditorMainActivity completes?**
-
-We've implemented `ActivityCollector.onExportDone(outputPath: String)` but it's never called. Is there a different callback interface, listener, or registration method we should use?
-
-### 2. SDK Documentation
-**Where is the official documentation for handling export completion in production apps?**
-
-We cannot find any documentation showing:
-- How to register export completion callbacks
-- How to receive the exported video file path
-- How to properly integrate editor results into the app workflow
-
-### 3. Result Mechanism
-**Does the SDK provide any of the following mechanisms?**
-- Broadcast receiver for export completion?
-- Result callback interface we need to implement?
-- Intent with result that we should listen for?
-- Should we use `startActivityForResult` instead? If so, how?
-
-### 4. Export Path
-**Where does the SDK save exported videos?**
-
-If there's no callback mechanism, we could potentially monitor a known directory. Where are exported videos saved by default?
-- `/storage/emulated/0/Movies/`?
-- `/storage/emulated/0/DCIM/`?
-- App-specific directory?
-
-### 5. Alternative Launch Method
-**Is there a different method to launch EditorMainActivity that supports result callbacks?**
-
-Current: `EditorMainActivity.startEditorActivityFromAlbum(activity, mediaList)`
-
-Is there an alternative like:
-- `EditorMainActivity.startEditorForResult(activity, requestCode, mediaList)`?
-- A builder pattern with result callback?
-- An intent-based approach with result extras?
-
----
-
-## Technical Environment
-
-- **SDK:** BytePlus EffectOne v1.8.0
-- **Android Version:** 14 (API Level 34)
-- **Language:** Kotlin with Kotlin DSL (build.gradle.kts)
-- **App Framework:** Flutter hybrid app with native Android integration
-- **Device:** Physical device (not emulator)
-- **Build Tool:** Gradle 8.7
-
----
-
-## Impact
-
-This issue is **blocking our production release**. Users can edit videos but cannot upload them because the export path is never returned to our app. The app restarts instead of receiving the video.
-
-**Affected User Flow:**
-1. User records/selects video ✅
-2. User edits video in BytePlus editor ✅
-3. User taps export ❌ (App restarts here)
-4. User uploads video ❌ (Never reached)
-
----
-
-## What We Need
-
-1. **The correct API/method to receive exported video path**
-2. **Official documentation or sample code** showing export completion handling
-3. **Explanation of the expected integration pattern** for production apps
-4. **Workaround or alternative approach** if the current implementation has limitations
-
----
-
-## Contact Information
-
-**Company:** Lykluk Digital  
-**App:** Lykluk (Social Video Platform)  
-**Package:** com.lykluk.lykluk  
-**Priority:** URGENT - Production Blocker
+1. ✅ **Clear documentation** on how to get the exported video path in v1.6.0
+2. ✅ **Version clarity** - What version should we actually be using?
+3. ✅ **Migration guide** if we need to upgrade from 1.6.0 to 1.8.0
+4. ✅ **Code examples** showing complete editor → export → get path flow
+5. ✅ **Version update notifications** - How will we know when new versions are released?
 
 ---
 
 ## Additional Notes
 
-We're happy to provide:
-- Full source code of our integration
-- Complete LogCat logs
-- Screen recordings showing the issue
-- APK for testing
-- Any other information needed
+- Our authentication works perfectly (EO_AUTH_SUCCESS)
+- The editor UI works great
+- Export completes successfully
+- We just need to know where the exported video is saved!
 
-Please respond with the correct implementation approach as soon as possible. We're ready to implement any changes needed.
+This is blocking our production deployment. Any urgent assistance would be greatly appreciated.
 
-Thank you!
+---
+
+**Repository:** https://github.com/lyklukdigital/mobile_app_v2  
+**Branch:** mvp-official  
+**Contact:** [Your contact information]
