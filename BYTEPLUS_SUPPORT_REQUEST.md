@@ -1,181 +1,125 @@
-# BytePlus EffectOne SDK Support Request
+# BytePlus EffectOne SDK - Technical Support Request
 
-## Issue: Cannot Get Exported Video File Path After Editing
+## Issue Summary
+We need to intercept the exported video file path after editing to pass it to our Flutter upload flow, instead of having the video automatically saved to the iOS Photos library.
 
-### Current Situation
+## Current Behavior
+1. User records/selects video → BytePlus camera opens ✅
+2. User edits video with effects → BytePlus editor works ✅  
+3. User clicks "Export" button → BytePlus export UI shows progress ✅
+4. Video reaches 100% → Saved to Photos library ✅
+5. **PROBLEM**: User is stuck on export screen, video path is NOT returned to our app ❌
 
-We are integrating BytePlus EffectOne SDK into our Android Flutter application for video editing functionality. The editor works perfectly, but **we cannot retrieve the exported video file path after the user completes editing and clicks "Next"**.
+## Desired Behavior
+After clicking "Export" and video reaches 100%:
+1. Get the exported video file path/URL
+2. Send path to Flutter via method channel
+3. Dismiss all BytePlus screens
+4. Navigate user to our app's upload flow (caption, location, etc.)
 
-### SDK Version Confusion
+## Technical Details
 
-**This is a critical issue we need clarification on:**
+### SDK Version
+- EffectOne iOS SDK v1.8.0
+- License: lykluk_test_20251027_20251231_com.lykluk.lyklukDev_1.8.0_472.licbag
+- Integration: Flutter + iOS Native (Swift)
 
-We have received multiple SDK versions from BytePlus, and the versioning is extremely confusing:
-
-1. **Initial SDK:** Version 1.6.0 (Maven dependency: `com.volcengine.effectone:editor-ui:1.6.0`)
-2. **Downloaded SDK Folder:** `EffectOne-1.8.0-Android-20250527-all` (claims to be v1.8.0)
-3. **Version Mismatch:** The downloaded folder says 1.8.0, but we're not sure if this is compatible with the Maven 1.6.0 we're using
-
-**PLEASE CLARIFY:**
-- What is the actual current stable version number?
-- If you update to a new version, how do we know? (Is there a changelog or notification?)
-- Should we use Maven dependencies or the downloaded SDK folders?
-- When you say "version 1.8.0", does that mean we need to stop using 1.6.0 from Maven?
-
-This version confusion is causing significant delays in our development.
-
----
-
-## Technical Problem Details
-
-### Current Implementation (SDK v1.6.0)
-
-We have successfully integrated:
-- ✅ SDK Authentication (EO_AUTH_SUCCESS)
-- ✅ Video Recording
-- ✅ Video Editing UI opens correctly
-- ✅ User can edit videos with all effects
-- ✅ Export progress shows 100% completion
-- ✅ Our custom `ExportActivity` launches via intent-filter `com.volcengine.effectone.Launch.EOExport`
-
-### The Problem
-
-**After the user clicks "Next" and export reaches 100%:**
-1. BytePlus successfully exports the video file somewhere on the device
-2. Our `ExportActivity` is launched (via the intent-filter)
-3. **We receive NO file path in any intent extra, callback, or parameter**
-4. We cannot find the video file to upload to our backend server
-
-### Code Implementation
-
-#### ExportActivity Registration (AndroidManifest.xml)
-```xml
-<activity
-    android:name=".ExportActivity"
-    android:exported="true"
-    android:launchMode="singleTask">
-    <intent-filter>
-        <action android:name="com.volcengine.effectone.Launch.EOExport" />
-        <category android:name="android.intent.category.DEFAULT" />
-    </intent-filter>
-</activity>
-```
-
-#### ExportActivity Implementation (Kotlin)
-```kotlin
-class ExportActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        
-        // Problem: How do we get the exported video path here?
-        val videoPath = intent?.getStringExtra("video_path")  // Always null
-        val outputPath = intent?.getStringExtra("outputPath")  // Always null
-        val filePath = intent?.getStringExtra("file_path")    // Always null
-        
-        // We have tried checking intent extras, intent data URI, everything is null
-        Log.d("ExportActivity", "Video path: $videoPath")  // Logs: "Video path: null"
-        
-        // Without the path, we cannot proceed with upload
-        ActivityCollector.onExportDone("") // Empty string because we have no path!
-    }
+### Current Implementation
+```swift
+func videoEditorViewControllerTapNext(
+    _ exportModel: EOExportModel, 
+    presentVC viewController: UIViewController
+) {
+    // This shows export UI and saves to Photos, but we can't get the path
+    EOExportViewController.startExport(
+        with: exportModel, 
+        presentVC: viewController
+    )
 }
 ```
 
-#### What We've Tried
+### What We've Tried
 
-1. **Checked all intent extras:**
-   - `video_path`, `outputPath`, `file_path`, `export_path`, `output`, `path`
-   - All return `null`
-
-2. **Checked intent data URI:**
-   ```kotlin
-   intent?.data?.path // Also null
+1. **Looking for delegate callbacks**
+   ```swift
+   // Tried implementing EOExportViewControllerDelegate
+   // Methods never called - delegate might not exist or work differently
+   func exportViewControllerDidFinishExport(
+       _ exportViewController: EOExportViewController,
+       outputPath: String
+   ) { }
    ```
 
-3. **Looked at the Export SDK documentation (BYTEPLUS EXPORT.md):**
-   - Found `EOExportManager` with `exportVideo()` and `IEOExportListener`
-   - **But these classes don't exist in SDK v1.6.0!**
-   - Are they only available in v1.8.0?
+2. **Trying to export programmatically**
+   ```swift
+   // exportModel.export(to:completion:) - doesn't exist
+   // exportModel.draftPath - doesn't exist
+   // exportModel.outputPath - doesn't exist
+   ```
 
-4. **Attempted to search for the file manually:**
-   - This is unreliable and could find wrong videos
-   - We need BytePlus to give us the correct path
+3. **Using reflection to discover properties**
+   ```swift
+   let mirror = Mirror(reflecting: exportModel)
+   // Need to know what properties/methods are actually available
+   ```
 
-### What We Need
+## Questions for BytePlus Support
 
-**Please provide clear instructions on how to:**
+### 1. How do we get the exported video file path?
+Is there a:
+- Completion callback/delegate method we should implement?
+- Property on `EOExportModel` that contains the output path?
+- Alternative export method that returns the file path?
 
-1. **Get the exported video file path after editing completes**
-   - Which intent extra key should we check?
-   - Or should we use a callback listener?
-   - Or do we need to use `EOExportManager` API (and if so, which SDK version)?
+### 2. Should we use Draft Box instead?
+Would saving to Draft Box give us access to the video path?
+```swift
+EODraftBoxController.presentDraftVCDelegate(self)
+```
 
-2. **Clarify the SDK version situation:**
-   - Are we supposed to migrate from 1.6.0 to 1.8.0?
-   - If yes, is there a migration guide?
-   - Why does the exported SDK folder say 1.8.0 but Maven still uses 1.6.0?
+### 3. Can we export without showing the UI?
+Is there a programmatic export method like:
+```swift
+exportModel.export(to: outputURL) { success, error in
+    // Get file path here
+}
+```
 
-3. **Provide complete export flow documentation:**
-   - Step-by-step: Editor → Export → Get file path → Return to app
-   - Code examples for Android/Kotlin
-   - Which callbacks/listeners to implement
+### 4. What's the recommended integration pattern?
+For apps that need to:
+- Let users edit videos with BytePlus
+- Get the edited video file
+- Upload to their own backend
+- NOT save to Photos library
 
----
+## Additional Context
 
-## Expected Behavior
+### App Flow
+```
+User clicks "+" → BytePlus Camera → Record/Select Video → 
+BytePlus Editor → Add Effects → Click "Export" →
+[NEED VIDEO PATH HERE] → Flutter Upload Screen → 
+Add Caption/Location → Post to Backend
+```
 
-After the user finishes editing and clicks "Next":
-1. BytePlus should export the video
-2. BytePlus should provide the exported video file path to our app
-3. We can then upload this video to our backend
+### Files Involved
+- `/ios/Runner/EffectOneModule.swift` - Native BytePlus integration
+- `/lib/core/services/byteplus_editor_service.dart` - Flutter service
+- `/lib/modules/home/presentation/nav_bar.dart` - Upload flow trigger
 
----
+## Urgency
+This is blocking our MVP launch. We need the export-to-upload flow working for users to post videos.
 
-## Current Behavior
+## Contact Information
+- Repository: lyklukdigital/mobile_app_v2
+- Branch: new-byteplus
+- Developer: AI Assistant helping client
 
-After the user finishes editing and clicks "Next":
-1. BytePlus exports the video successfully ✅
-2. Our `ExportActivity` launches ✅
-3. **We receive no file path** ❌
-4. Cannot proceed with upload ❌
-
----
-
-## Environment
-
-- **SDK Name:** BytePlus EffectOne SDK
-- **SDK Version:** 1.6.0 (Maven) or 1.8.0 (Downloaded folder) - **Please clarify!**
-- **Platform:** Android (Kotlin)
-- **Framework:** Flutter
-- **Build Configuration:**
-  ```gradle
-  val effectOneVersion = "1.6.0"
-  api("com.volcengine.effectone:editor-ui:${effectOneVersion}")
-  api("com.volcengine.effectone:recorder-ui:${effectOneVersion}")
-  api("com.volcengine.effectone:base-resource:${effectOneVersion}")
-  ```
-
----
-
-## Request for BytePlus Team
-
+## Request
 Please provide:
+1. Documentation for programmatic video export
+2. Sample code showing how to get exported video path
+3. Alternative approach if export callback doesn't exist
+4. Timeline for any SDK updates if feature is missing
 
-1. ✅ **Clear documentation** on how to get the exported video path in v1.6.0
-2. ✅ **Version clarity** - What version should we actually be using?
-3. ✅ **Migration guide** if we need to upgrade from 1.6.0 to 1.8.0
-4. ✅ **Code examples** showing complete editor → export → get path flow
-5. ✅ **Version update notifications** - How will we know when new versions are released?
-
----
-
-## Additional Notes
-
-- Our authentication works perfectly (EO_AUTH_SUCCESS)
-- The editor UI works great
-- Export completes successfully
-- We just need to know where the exported video is saved!
-
-This is blocking our production deployment. Any urgent assistance would be greatly appreciated.
-
----
+Thank you for your support!
