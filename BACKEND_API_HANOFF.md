@@ -1,98 +1,331 @@
-# Backend API Handoff — Lykluk (frontend expectations)
+# BytePlus EffectOne SDK Integration Issue - Support Document
 
-This document lists the REST API endpoints the frontend currently calls or expects, which items are already present, and where the backend needs to verify or add behavior to avoid frontend regressions.
-
-Assumptions:
-- The app is running in REST API mode (see `Endpoints.baseUrl` / `BackendConfig`).
-- All responses follow the pattern `{ "data": <...>, "message": "..." }` unless noted.
-
-Priority: High items block UX; Medium items are important but not blocking; Low are optional improvements.
+**Date**: December 1, 2025  
+**App**: Lykluk Mobile (Flutter/Android)  
+**BytePlus SDK Version**: Android 1.6.0 (iOS uses 1.8.0)  
+**Issue Type**: Authentication Error & Export Callback Failure
 
 ---
 
-**1. FYP / Follow status consistency**
-- Status: Needs verification
-- Frontend usage: `GET ${Endpoints.videoForYou}` (code: `Endpoints.videoForYou` -> `/video/fyp`) returns paginated videos parsed by `PostRepoImpl.getPosts` and `PostModel.fromJson`.
-- Frontend expects each video JSON to include `User.followedBy` (array) OR a boolean flag indicating whether the current user follows that video owner. The frontend computes `PostModel.isFollowing` from `post.user.followedBy`.
-- Action for backend: Ensure the video list responses include either:
-  - `User.followedBy`: array of users (each with `id`) containing current user when applicable; OR
-  - `User.isFollowedByCurrentUser`: boolean (preferred lighter payload).
-- Request: same as current FYP query params (cursor/pagination). No change to method.
-- Response (suggested minimal):
+## Critical Context
+
+**IMPORTANT**: The app was working this morning (December 1, 2025) before pulling latest code from GitHub. After pulling the project, BytePlus integration stopped working completely.
+
+### Current Behavior
+1. **Authentication Error**: "no authentication found please contact sales for further information or to obtain an evaluation license"
+2. Sometimes the editor loads but still shows the authentication error
+3. Export never completes or returns to Flutter app
+4. Video editing flow is completely broken
+
+---
+
+## License Information
+
+**License File**: `assets/BPVod.lic`  
+**License Details**:
+- Package Name: `com.lykluk.lykluk`
+- SDK Version: `1.8.0`
+- Expiration: `2025-12-31` (valid for 30 more days)
+- MD5 Checksum: `09A668C5A6C7C00D3082CD85295848A4`
+
+**License File Path in Code**:
+```kotlin
+// android/app/src/main/kotlin/com/lykluk/lykluk/MainActivity.kt
+private const val LICENSE_NAME = "BPVod.lic"
+private const val LICENSE_PATH = "assets/$LICENSE_NAME"
 ```
-{
-  "data": {
-    "videos": [
-      {
-        "id": 123,
-        "User": { "userId": 45, "username": "alice", "followedBy": [ { "User": { "id": 99 } } ], "isFollowedByCurrentUser": true },
-        ...
-      }
-    ],
-    "cursor": "..."
+
+**Verification**: License file exists and MD5 matches expected value.
+
+---
+
+## What We've Tried (Past 2 Days)
+
+### 1. License Verification
+- ✅ Confirmed license file exists in `assets/BPVod.lic`
+- ✅ Verified MD5 checksum matches
+- ✅ Confirmed expiration date is valid (Dec 31, 2025)
+- ✅ Verified package name matches: `com.lykluk.lykluk`
+- ✅ License is being loaded via `context.assets.open("assets/BPVod.lic")`
+
+### 2. SDK Initialization
+- ✅ Added `VEEffectSDK.initEffectSDK()` in MainActivity.onCreate()
+- ✅ Verified initialization happens before any BytePlus activities launch
+- ✅ Added extensive logging to track initialization flow
+- ✅ Confirmed all initialization code executes without errors
+
+### 3. Activity Configuration
+- ✅ Configured MainActivity, AlbumActivity, EditorMainActivity, ExportActivity
+- ✅ Added proper intent-filters for BytePlus SDK activities
+- ✅ Implemented ActivityCollector for proper activity lifecycle management
+- ✅ Added ExportActivity for handling video export completion
+
+### 4. Export Callback Implementation
+- ✅ Implemented dual callback mechanism (pendingResult + method channel)
+- ✅ Added retry logic for MainActivity instance timing issues
+- ✅ Changed method channel from 'onVideoExported' to 'exportDone' (per iOS example from Mark)
+- ✅ Changed argument format from map to direct string (per iOS convention)
+- ✅ Verified callbacks execute successfully on Android side
+
+### 5. Method Channel Setup
+- ✅ Method channel name: `effectOne.flutter`
+- ✅ Implemented handler for 'exportDone', 'exportProcess', 'exportError'
+- ✅ Handler registered during app initialization
+- ✅ Verified Android sends callbacks but Flutter never receives them
+
+---
+
+## Technical Issue Details
+
+### Issue 1: Authentication Error (PRIMARY ISSUE)
+
+**Error Message**: "no authentication found please contact sales for further information or to obtain an evaluation license"
+
+**When It Occurs**: 
+- Immediately when trying to open gallery/album picker
+- Sometimes appears after editor loads
+- Blocks all BytePlus functionality
+
+**What We Verified**:
+1. License file exists and is readable
+2. License MD5 matches expected checksum
+3. Package name in license matches app package name
+4. SDK initialization is called before any BytePlus activities
+5. License expiration date is valid (30 days remaining)
+
+**Logs Showing License Load**:
+```
+D/MainActivity: 🔑 Loading license from: assets/BPVod.lic
+D/MainActivity: ✅ License loaded successfully, size: 4789 bytes
+D/MainActivity: ✅ VEEffectSDK initialized successfully
+```
+
+**Despite Successful License Load, Authentication Still Fails**
+
+### Issue 2: Export Callback Never Reaches Flutter (SECONDARY ISSUE)
+
+Even when export completes (on previous working builds), Flutter never receives the video path.
+
+**Android Side (WORKING)**:
+```
+D/ActivityCollector: 🎬 onExportDone called with path: /storage/emulated/0/DCIM/lykluk-20251201-160516.mp4
+D/MainActivity: ✅ Successfully sent via pendingResult!
+D/MainActivity: ✅ Successfully sent via method channel!
+```
+
+**Flutter Side (NOT WORKING)**:
+- `await openEditorFromAlbum()` never resolves
+- Method channel handler never receives 'exportDone' callback
+- No logs from BytePlusEditorService.initialize() handler
+- App returns to home screen instead of upload screen
+
+**Root Cause**: The pendingResult and method channel callbacks are sent successfully from Android, but Flutter's awaiting code never receives them. This suggests:
+1. The method call context is lost when editor activities launch
+2. The Dart isolate connection is broken
+3. Flutter's method channel handler isn't properly registered
+
+---
+
+## Key Code Files
+
+### MainActivity.kt
+**Location**: `android/app/src/main/kotlin/com/lykluk/lykluk/MainActivity.kt`
+
+**Key Methods**:
+- `onCreate()`: Initializes VEEffectSDK with license
+- `onMethodCall()`: Handles Flutter → Android method calls ('draft', 'record', etc.)
+- `sendVideoPathToFlutter()`: Sends export result back to Flutter via pendingResult and method channel
+- `onActivityResult()`: Handles results from BytePlus activities
+
+**License Loading Code**:
+```kotlin
+// Load license from assets
+val licenseStream = context.assets.open(LICENSE_PATH)
+val licenseContent = licenseStream.readBytes()
+
+// Initialize EffectSDK
+val initResult = VEEffectSDK.initEffectSDK(licenseContent, LICENSE_NAME, context)
+```
+
+### BytePlusEditorService.dart
+**Location**: `lib/core/services/byteplus_editor_service.dart`
+
+**Key Methods**:
+- `initialize()`: Sets up method channel handler for 'exportDone' callbacks
+- `openEditorFromAlbum()`: Opens gallery → editor → export flow, awaits result
+- `openRecorder()`: Opens camera → recording → editing → export flow
+
+**Method Channel Handler**:
+```dart
+_channel.setMethodCallHandler((call) async {
+  if (call.method == 'exportDone') {
+    final path = call.arguments as String?;
+    if (path != null && path.isNotEmpty) {
+      _videoExportedController.add(path);
+    }
   }
-}
+});
 ```
 
-**2. FYP like consistency (likes reflected in feed)**
-- Status: Needs verification
-- Frontend usage: `PostModel.videoLikes` must be present for `isLiked` to work. The frontend toggles likes using `POST ${Endpoints.videoLikeToggle}{postID}` and expects the response payload to contain `{ data: { like: <bool> } }`.
-- Action for backend: Ensure feed responses include either `videoLikes` (list) or a boolean `isLiked` for each video and that the like toggle returns `{ data: { like: true|false } }`.
-- Example response for toggle:
-```
-{ "data": { "like": true }, "message": "" }
-```
+### ActivityCollector.kt
+**Location**: `android/app/src/main/kotlin/com/lykluk/lykluk/ActivityCollector.kt`
 
-**3. Saved videos (retrieve and toggle)**
-- Status: Implemented (verify behavior)
-- Endpoints: `GET ${Endpoints.getSavedVideos}` -> `/video/saved` and toggle via `POST ${Endpoints.saveVideo}{videoId}` or `POST ${Endpoints.unsaveVideo}{videoId}`.
-- Frontend expects `getSavedPosts` to return a paginated object with `videos` array (cursor pagination). Ensure response shape matches `CursorPaginatedResponse` (field `videos`).
+**Purpose**: Maintains weak references to all BytePlus activities for proper cleanup and callback routing
 
-**4. Comments retrieval and replies**
-- Status: Implemented (verify response shape)
-- Endpoints:
-  - Get comments: `GET ${Endpoints.commentToVideo}{videoId}` -> `/video/comment/{videoId}`
-  - Get replies: `GET ${Endpoints.videoComments}{videoId}/reply/{commentId}` (code constructs these variants)
-  - Post comment: `POST ${Endpoints.commentToVideo}{videoId}`
-  - Reply: `POST ${Endpoints.commentReply.replace...}`
-- Frontend expects a paginated `data` array and uses `PaginatedResponse` with field `data`. Confirm backend returns `{ data: [ ... ], meta?: {...} }` or `{ data: { data: [...], pagination... } }` in the exact shape used by `CommentRepoImpl.getComments`.
+**Key Callbacks**:
+- `onExportDone()`: Called when export completes, triggers MainActivity.sendVideoPathToFlutter()
+- `onRecordSuccess()`: Called when recording completes
 
-**5. Mutuals (feed / visibility option)**
-- Status: Missing / optional (frontend currently treats Mutuals as 'same as feed' in places)
-- Context: UI exposes a "Mutuals" tab (people you follow back). There is no dedicated `/mutuals` endpoint in `Endpoints`.
-- Action for backend (optional but recommended): Provide an endpoint to fetch mutuals or include `isMutual`/`visibility` metadata in profile and post payloads to support the "Mutuals" audience and faster server-side filtering.
-- Suggested endpoint: `GET /profile/mutuals?userId={id}&cursor=...` returning paginated list of mutual connections or videos.
+### ExportActivity.kt
+**Location**: `android/app/src/main/kotlin/com/lykluk/lykluk/ExportActivity.kt`
 
-**6. Reposts**
-- Status: Implemented
-- Endpoints: `POST ${Endpoints.repostVideo}{videoId}` and `POST ${Endpoints.unrepostVideo}{videoId}` exist. Response expected: `{ data: { repost: true|false } }`.
+**Purpose**: Handles video export progress and completion
 
-**7. Download / sharing URLs**
-- Status: Implemented (verify behavior)
-- Endpoints: `POST ${Endpoints.sharingDownload}` -> `/download` and `GET ${Endpoints.sharingCheckDownload}` -> `/get_download` (see `Endpoints` constants).
-- Action for backend: Confirm the download endpoint returns a signed URL / file URL and any watermarking enforcement (Lykluk logo) happens server-side or the generated asset includes watermark. Provide the expected payload schema and TTL for signed URLs.
-
-**8. Notifications (REST vs Firebase)**
-- Status: Implemented (REST endpoints present) — verify
-- Endpoints: `GET/PUT/DELETE ${Endpoints.notifications}` (`/notifications`) plus `/notifications/settings`, `/notifications/stats`, `/notifications/unread-count`.
-- Frontend details: When `BackendConfig.useRestApiNotifications` is true the app uses REST above to list, delete, mark-as-read, etc. The push delivery still uses FCM for incoming push messages.
-- Action for backend: Ensure the REST APIs return notification objects with metadata compatible with `NotificationModel` in the frontend (id, type, createdAt, read/unread, payload metadata, optional `mutualCount`). Provide examples of notification payloads used by the app.
-
-**9. Social sign-in (Google / Apple)**
-- Status: Implemented
-- Endpoint: `POST ${Endpoints.authSocial}` -> `/auth/social-verified`.
-- Frontend sends body: `{"provider": "google|apple", "idToken": "...", "interestIds": [...]}` and expects an auth response consistent with sign-in/signup (`AuthResponse` with `siginUser`, `accessToken`, `refreshToken`).
-
-**10. Video view counts (increment / updates)**
-- Status: Partial — endpoint constant exists, no frontend usage found
-- Endpoint: `POST ${Endpoints.videoView}{videoId}` -> `/video/view/{videoId}` is defined but not invoked by repo code. The frontend listens for socket `video_update` events to receive live updates.
-- Action for backend: Clarify expected flow:
-  - If view counting is server-side only, ensure the server increments view count when streaming/delivery occurs and emits `video_update` socket events with updated counts.
-  - If frontend should report views, provide the REST contract (POST `/video/view/{videoId}`) and expected response `{ data: { views: <int> } }` and confirm any anti-abuse rules (unique per-user/day, required headers, etc.).
+**Key Features**:
+- Auto-starts export when launched (no manual button click)
+- Shows progress bar (0-100%)
+- Calls ActivityCollector.onExportDone() on completion
 
 ---
 
-Notes & Recommendations
-- Where the frontend expects specific keys (e.g., like toggle returns `{ data: { like: bool } }`, repost returns `{ data: { repost: bool } }`), please confirm server responses match those keys or add compatibility on the frontend.
-- Prefer sending small boolean flags on list endpoints (e.g., `User.isFollowedByCurrentUser`, `isLiked`, `isSaved`) instead of embedding arrays (`followedBy`, `videoLikes`) to reduce payload sizes.
-- Provide sample payloads for the main endpoints so frontend and backend can iterate quickly.
+## Version Mismatch Concern
+
+**Android**: BytePlus EffectOne SDK v1.6.0  
+**iOS**: BytePlus EffectOne SDK v1.8.0  
+**License**: Created for v1.8.0
+
+**Potential Issue**: License was created for SDK v1.8.0 but Android is using v1.6.0. This might cause authentication issues.
+
+**Request for BytePlus Support**: 
+- Can a v1.8.0 license work with v1.6.0 SDK?
+- Should we upgrade Android SDK to v1.8.0?
+- Can you provide a license specifically for v1.6.0?
+
+---
+
+## Sample Logs
+
+### Successful License Load (but authentication still fails)
+```
+12-01 16:05:05.123 D/MainActivity: 🔑 Loading license from: assets/BPVod.lic
+12-01 16:05:05.145 D/MainActivity: 📦 License file size: 4789 bytes
+12-01 16:05:05.147 D/MainActivity: 🔐 License MD5: 09A668C5A6C7C00D3082CD85295848A4
+12-01 16:05:05.149 D/MainActivity: ✅ VEEffectSDK initialized successfully
+12-01 16:05:05.152 D/MainActivity: 📱 MainActivity created and ready
+```
+
+### Export Completion (Android Side)
+```
+12-01 16:05:21.950 D/ActivityCollector: 🎬 albumActivityRef is null: true
+12-01 16:05:21.951 D/ActivityCollector: 🎬 recordActivityRef is null: false
+12-01 16:05:21.951 D/MainActivity: 🎬🎬🎬 sendVideoPathToFlutter called with: /storage/emulated/0/DCIM/lykluk-20251201-160516.mp4 (retry: 0)
+12-01 16:05:21.953 D/MainActivity: 🎬 methodChannel is null: false
+12-01 16:05:21.954 D/MainActivity: ✅ Sending video path via pendingResult: /storage/emulated/0/DCIM/lykluk-20251201-160516.mp4
+12-01 16:05:21.955 D/MainActivity: ✅ Successfully sent via pendingResult!
+12-01 16:05:21.956 D/MainActivity: ✅ Sending video path via method channel: /storage/emulated/0/DCIM/lykluk-20251201-160516.mp4
+12-01 16:05:21.957 D/MainActivity: ✅ Successfully sent via method channel!
+```
+
+### Flutter Side (No Logs - Callback Never Received)
+```
+12-01 16:05:22.796 I flutter: App is hidden
+12-01 16:05:22.798 I flutter: App is inactive
+// NO LOGS FROM BytePlusEditorService
+// NO LOGS FROM post_record_screen navigation code
+// await openEditorFromAlbum() never resolves
+```
+
+---
+
+## Questions for BytePlus Support
+
+### 1. License/Authentication
+- Why does authentication fail despite valid license file?
+- Is SDK version mismatch (v1.6.0 vs v1.8.0 license) causing this?
+- How can we verify the license is being loaded correctly by the SDK?
+- Are there any additional initialization steps required for v1.6.0?
+
+### 2. Activity Lifecycle
+- How should we handle activity lifecycle with Flutter integration?
+- Is there a recommended way to return results from BytePlus activities to Flutter?
+- Should we use `startActivityForResult()` or method channels?
+
+### 3. Export Callback
+- What is the correct way to receive export completion in Flutter?
+- Should we use iOS-style method channel callbacks ('exportDone')?
+- How do other Flutter integrations handle this?
+
+### 4. SDK Version
+- Should we upgrade Android SDK from v1.6.0 to v1.8.0 to match iOS?
+- What are the breaking changes between v1.6.0 and v1.8.0?
+- Can you provide documentation for v1.6.0 specifically?
+
+---
+
+## Request for BytePlus Team
+
+### What We Need
+1. **Verify License**: Can you check if our license is valid and properly configured?
+2. **Version Guidance**: Should we upgrade to v1.8.0 or stay on v1.6.0?
+3. **Sample Code**: Do you have working Flutter + BytePlus Android sample code we can reference?
+4. **Debug Assistance**: Can you help us understand why authentication fails despite successful license load?
+
+### Files We Can Share
+- License file: `assets/BPVod.lic`
+- MainActivity.kt (complete file)
+- Full logcat output showing initialization and authentication error
+- Any other files needed for debugging
+
+---
+
+## Environment
+
+**Device**: OPPO PBFM00 (Android 8.1.0, API 27)  
+**Flutter**: 3.x  
+**Build Tool**: Gradle 8.x  
+**Kotlin**: 1.9.x  
+**Target SDK**: 34  
+**Min SDK**: 26
+
+**Dependencies**:
+```
+com.volcengine.effectone:core:1.6.0
+com.volcengine.effectone:resource:1.6.0  
+com.volcengine.effectone:effect:1.6.0
+com.volcengine.effectone:mediarecord:1.6.0
+```
+
+---
+
+## Working State Reference
+
+**Last Working Time**: December 1, 2025, ~8:00 AM (before git pull)  
+**What Changed**: Pulled latest code from GitHub  
+**Result**: BytePlus authentication completely broken
+
+**Request**: Can you help us identify what might have changed in the codebase that broke the integration?
+
+---
+
+## Summary
+
+We have a valid BytePlus license that was working this morning. After pulling code from GitHub, authentication completely broke. We've verified:
+- ✅ License file exists and loads successfully
+- ✅ SDK initialization completes without errors  
+- ✅ All activity configurations are correct
+- ✅ Export callbacks work on Android side
+- ❌ Authentication fails with "no authentication found" error
+- ❌ Flutter never receives export completion callbacks
+
+We suspect either:
+1. SDK version mismatch (v1.6.0 SDK with v1.8.0 license)
+2. Something in the pulled code broke license validation
+3. Missing initialization step specific to v1.6.0
+
+We need BytePlus support to help diagnose why authentication fails despite valid license.
+
+---
+
+**Prepared for**: BytePlus Support Video Call  
+**Contact**: Lykluk Development Team  
+**Date**: December 1, 2025
