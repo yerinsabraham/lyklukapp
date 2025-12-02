@@ -1,0 +1,156 @@
+================================================================================
+BYTEPLUS iOS EXPORT ISSUE - DEBUG LOG REPORT
+Date: December 2, 2025
+SDK Version: iOS 1.8.0 (EffectOne)
+App: lykluk Mobile App
+================================================================================
+
+CRITICAL ISSUE IDENTIFIED:
+==========================
+The BytePlus SDK is failing to load the face detection AI models due to 
+missing or incorrect model file paths. This is preventing the SDK from 
+functioning properly.
+
+ERROR PATTERN (Repeating continuously):
+---------------------------------------
+## 2025-12-02 08:23:50-54 [threadid:1892691968,BachAlgorithmFace.cpp,825] 
+ERROR ## [AE_ALGORITHM_TAG]AlgorithmFace create handler fail:-1000
+
+## [AE_ALGORITHM_TAG]Algorithm type: 4 load model ttfacemodel/tt_face_v11.1.model 
+failed: -1000, path is (null)/ttfacemodel/algo_ggl1pqh_v11.1.model
+
+## [AE_ALGORITHM_TAG]report model md5 path: (null)/ttfacemodel/algo_ggl1pqh_v11.1.model
+
+ROOT CAUSE ANALYSIS:
+===================
+1. Model Path is NULL: The SDK cannot find the face detection model files
+   - Expected path: /path/to/resources/ttfacemodel/algo_ggl1pqh_v11.1.model
+   - Actual path: (null)/ttfacemodel/algo_ggl1pqh_v11.1.model
+   
+2. Error Code: -1000 indicates MODEL_NOT_FOUND or INITIALIZATION_FAILED
+
+3. Frequency: This error repeats hundreds of times during video recording/editing,
+   suggesting the SDK continuously tries to initialize face detection algorithms
+   and fails each time.
+
+4. Impact: Without face detection models loaded:
+   - Beauty filters may not work
+   - Face stickers/effects may not apply correctly
+   - AR effects requiring face tracking will fail
+   - Video export may fail or produce unexpected results
+
+MISSING LOGS (What We Expected But Didn't See):
+===============================================
+❌ NO logs from our app's BytePlus integration code:
+   - No "🎯 videoEditorViewControllerTapNext CALLED!" log
+   - No "📤 [BytePlus Export] Starting export with delegate" log
+   - No "🎉 exportVideoPath:videoImage: WAS INVOKED!" log
+   - No "📲 Sending video path to Flutter" log
+
+This suggests the user either:
+   a) Did not reach the export stage yet (still recording/editing)
+   b) The export button was not tapped
+   c) The video recording/editing is stuck due to model loading failures
+
+INTEGRATION STATUS:
+==================
+✅ App Startup: Running (no startup errors visible)
+⚠️  BytePlus SDK: PARTIALLY INITIALIZED (models failing to load)
+❌ Face Detection Models: NOT LOADED (path is null)
+❓ Export Flow: NOT ATTEMPTED (no export logs present)
+❓ Video Recording: UNKNOWN (no recording start/stop logs)
+
+TECHNICAL DETAILS:
+=================
+- Thread ID: 1892691968
+- Component: BachAlgorithmFace.cpp (BytePlus internal face detection)
+- Algorithm Type: 4 (likely face detection/tracking)
+- Model Name: tt_face_v11.1.model / algo_ggl1pqh_v11.1.model
+- Error Count: 100+ occurrences in 4 seconds (08:23:50 - 08:23:54)
+
+RESOURCE CONFIGURATION ISSUE:
+=============================
+The model path showing as "(null)" indicates the BytePlus SDK resource 
+base directory is not set correctly. This should be configured during 
+SDK initialization in EffectOneModule.swift:
+
+Expected flow:
+1. App starts → makeAuth() is called
+2. Authentication succeeds → initEOSDK() is called  
+3. EOSDK.initSDK() runs → resourceConfig() is called
+4. Resource base directory should be set to either:
+   - Built-in resources: Bundle.main/EOLocalResources.bundle
+   - Downloaded resources: Documents/BytePlusResources
+
+Current issue: The resource path is NULL, meaning resourceConfig() either:
+   a) Never ran
+   b) Ran but couldn't find the resource bundle
+   c) Set an incorrect or empty path
+
+RECOMMENDATIONS FOR BYTEPLUS TEAM:
+==================================
+1. VERIFY MODEL FILES:
+   - Check if tt_face_v11.1.model exists in the SDK package
+   - Confirm the expected path structure for model files
+   - Validate model file permissions and accessibility
+
+2. CHECK RESOURCE INITIALIZATION:
+   - Confirm resourceConfig() is being called after authentication
+   - Verify the resource base directory path is valid
+   - Check if EOLocalResources.bundle is included in the app bundle
+
+3. INVESTIGATE ERROR CODE -1000:
+   - What does error code -1000 specifically mean in EffectOne SDK?
+   - Are there specific requirements for model file locations?
+   - Is there a minimum iOS version or hardware requirement not being met?
+
+4. PROVIDE GUIDANCE ON:
+   - Correct resource bundle setup for iOS
+   - Required model files and their locations
+   - How to verify model files are accessible before SDK initialization
+
+NEXT STEPS:
+===========
+1. User should provide additional logs showing:
+   - App startup sequence (authentication logs)
+   - Resource configuration logs
+   - Any BytePlus SDK initialization errors
+
+2. Check if EOLocalResources.bundle exists in app:
+   - Open Xcode project
+   - Navigate to Runner target → Build Phases → Copy Bundle Resources
+   - Verify EOLocalResources.bundle is listed
+
+3. Verify model files inside bundle:
+   - Right-click EOLocalResources.bundle → Show in Finder
+   - Check for ttfacemodel/ directory
+   - Confirm algo_ggl1pqh_v11.1.model file exists
+
+4. Test with minimal SDK setup:
+   - Try initializing SDK with built-in resources only
+   - Disable remote resource downloading
+   - Use offline mode
+
+ADDITIONAL CONTEXT:
+==================
+- Firebase connection: Working (WatchStream error is normal for idle connections)
+- App state: Foreground, active
+- Device: iOS (version unknown from logs)
+- Network: Connected (Firebase active)
+
+================================================================================
+END OF REPORT
+================================================================================
+
+NOTE TO BYTEPLUS SUPPORT:
+This log shows the SDK is failing to load face detection models continuously
+throughout the session. The path shows as "(null)" which indicates a resource
+configuration issue, not an export callback issue. Please advise on:
+
+1. How to properly configure resource paths for iOS 1.8.0 SDK
+2. Whether these models are required for basic export functionality
+3. If there's a way to export videos without face detection models
+4. Correct setup procedure for EOLocalResources.bundle
+
+Our export callback implementation is ready (delegate is set correctly), but 
+we cannot test it until the SDK successfully initializes with model files.
