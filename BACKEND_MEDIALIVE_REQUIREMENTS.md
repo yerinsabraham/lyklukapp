@@ -15,6 +15,59 @@ This document specifies all backend requirements for:
 
 Live streaming is implemented as a **premium e-commerce feature** under `/api/v1/ecommerce/live`.
 
+---
+
+## 📑 Table of Contents
+
+### Live Streaming Integration
+- [Architecture Decision](#architecture-decision)
+- [E-Commerce Integration](#-e-commerce-integration-critical)
+  - [Store Subscription Requirements](#store-subscription-requirements)
+  - [Store Verification Requirements](#store-verification-requirements)
+- [Database Schema Changes](#-database-schema-changes)
+  - [live_streams Table](#new-table-live_streams)
+  - [live_products Table](#new-table-live_products)
+  - [live_viewers Table](#new-table-live_viewers)
+- [E-Commerce Integration Requirements](#️-e-commerce-integration-requirements)
+  - [Store Subscription Validation](#store-subscription-validation)
+  - [Commission Rate Calculation](#commission-rate-calculation)
+  - [Product Pinning Validation](#product-pinning-validation)
+  - [Order Source Tracking](#order-source-tracking)
+  - [Analytics Integration](#analytics-integration)
+- [API Endpoints Required](#-api-endpoints-required)
+  - [1. Create Live Stream](#1-create-live-stream)
+  - [2. Request Stream Access](#2-request-stream-access-viewer)
+  - [3. Start Live Stream](#3-start-live-stream)
+  - [4. End Live Stream](#4-end-live-stream)
+  - [5. Pin Product](#5-pin-product-live-commerce)
+  - [6. Get Active Streams](#6-get-active-streams)
+  - [7. Get Stream Details](#7-get-stream-details)
+  - [8. Purchase Stream Access](#8-purchase-stream-access)
+  - [9. Get Replays](#9-get-replays)
+  - [10. Check Creator Tier Limits](#10-check-creator-tier-limits)
+- [BytePlus Callback Integration](#-byteplus-callback-integration)
+- [Payment & Commission Calculation](#-payment--commission-calculation)
+- [African Payment Integration](#-african-payment-integration-requirements)
+- [Security Requirements](#-security-requirements)
+- [Testing Requirements](#-testing-requirements)
+- [BytePlus OpenAPI Integration](#-byteplus-openapi-integration)
+
+### Missing E-Commerce Endpoints
+- [Missing E-Commerce Endpoints Overview](#-missing-e-commerce-endpoints-not-yet-implemented)
+  - [Categories Endpoints (3)](#-categories-3-endpoints---not-implemented)
+  - [Logistics & Carriers Endpoints (11)](#-logistics--carriers-11-endpoints---not-implemented)
+  - [Health Check Endpoint (1)](#️-health-check-1-endpoint---not-implemented)
+- [Implementation Priority](#-implementation-priority)
+- [Testing Status](#-testing-status)
+- [Backend Team Action Items](#-backend-team-action-items)
+
+### Resources & Deployment
+- [Deployment Checklist](#-deployment-checklist)
+- [Questions for Backend Team](#-questions-for-backend-team)
+- [Resources](#-resources)
+
+---
+
 ### Architecture Decision
 **Live streaming is NOT a separate service** - it's a module within the e-commerce service:
 ```
