@@ -1,307 +1,250 @@
-# Backend Requirements: BytePlus MediaLive Integration
+# Backend Requirements: BytePlus MediaLive & E-Commerce Integration
 
-**Date:** December 18, 2025  
+**Date:** December 19, 2025 (Updated - Added Missing E-Commerce Endpoints)  
 **For:** Backend Development Team  
-**Project:** LykLuk Live Streaming (Paid Monetization)  
-**E-Commerce Integration:** ✅ Integrated with existing store/product system
+**Project:** LykLuk Live Streaming + E-Commerce Platform  
+**Status:** ⚠️ 14 E-Commerce Endpoints Pending Implementation
 
 ---
 
 ## 🎯 Overview
 
-This document specifies all backend requirements for integrating **BytePlus MediaLive** into LykLuk. The live streaming feature is **monetization-first** and **fully integrated with the existing e-commerce system**.
+This document specifies all backend requirements for:
+1. **BytePlus MediaLive** integration for live streaming
+2. **Missing E-Commerce Endpoints** that need implementation (Categories, Logistics, Health Check)
+
+Live streaming is implemented as a **premium e-commerce feature** under `/api/v1/ecommerce/live`.
+
+### Architecture Decision
+**Live streaming is NOT a separate service** - it's a module within the e-commerce service:
+```
+e-commerce/
+├── src/
+│   ├── store/          # Existing
+│   ├── product/        # Existing
+│   ├── order/          # Existing
+│   ├── subscription/   # Existing
+│   └── live/           # NEW: Live streaming module
+│       ├── live.controller.ts
+│       ├── live.service.ts
+│       ├── live.module.ts
+│       └── dto/
+```
 
 ### Core Principles
-1. ✅ **All stream credentials generated server-side**
-2. ✅ **Payment enforcement before stream access**
-3. ✅ **BytePlus OpenAPI integration for stream management**
-4. ✅ **Callback handling for stream lifecycle events**
-5. ✅ **Integrated with existing stores and products**
-6. ✅ **Uses store subscription limits and commission rates**
+1. ✅ **Requires verified store** (uses existing StoreKYC)
+2. ✅ **Subscription-gated** (FREE can't stream, BASIC+ only)
+3. ✅ **Store-based monetization** (uses existing commission rates)
+4. ✅ **Product pinning** (references existing products)
+5. ✅ **Analytics integration** (extends existing dashboard)
+6. ✅ **BytePlus OpenAPI** (server-side stream management)
 
 ---
 
-## 🔗 E-Commerce Integration
+## 🔗 E-Commerce Integration (CRITICAL)
 
-### Store Association
-- **Every live stream belongs to a store** (required `storeId`)
-- Users select which store when creating a stream
-- If user has only one store, auto-select it
-- Store must be **verified** to create live streams
+### Store Subscription Requirements
 
-### Subscription Limits
-Live streaming feature gates based on existing store subscription:
+**Live streaming is a PREMIUM feature** - enforced by subscription tier:
 
-| Plan | Live Streaming | Concurrent Streams | Commission Rate |
-|------|---------------|-------------------|----------------|
-| FREE | ❌ Not allowed | 0 | 10% |
-| BASIC | ✅ Allowed | 1 | 7% |
-| CLASSIC | ✅ Allowed | 2 | 5% |
-| PREMIUM | ✅ Allowed | 5 | 3% |
+| Plan | Monthly Price | Live Streaming | Max Streams/Month | Max Duration | Commission |
+|------|--------------|----------------|-------------------|--------------|------------|
+| **FREE** | ₦0 | ❌ **BLOCKED** | 0 | - | 10% |
+| **BASIC** | ₦9.9 (~$10) | ✅ Allowed | 5 | 1 hour | 7% |
+| **CLASSIC** | ₦19.9 (~$20) | ✅ Allowed | Unlimited | 3 hours | 5% |
+| **PREMIUM** | ₦34.5 (~$35) | ✅ Allowed | Unlimited | Unlimited | 3% |
 
-**Important:** Use store's subscription commission rate, not hardcoded 8%
-
-### Product Pinning
-- Products pinned during `LIVE_COMMERCE` streams reference existing e-commerce products
-- Backend must verify product belongs to same store as stream
-- Product must be ACTIVE status
-- Use existing product data (price, images, inventory)
-
-### Order Tracking
-- Sales during live streams create regular e-commerce orders
-- Add `orderSource` field: `"LIVE_STREAM"` vs `"REGULAR"`
-- Add optional `streamId` to orders for analytics
-- Use store's commission rate from subscription plan
-
----
-
-## 📊 Database Schema Requirements
-
-### 1. `live_streams` Table/Collection
-
-```json
-{
-  "id": "string (UUID)",
-  "creatorId": "string (user ID reference)",
-  "storeId": "integer (references stores.id) - REQUIRED",
-  "title": "string (max 100 chars)",
-  "description": "string (max 500 chars)",
-  "thumbnailUrl": "string (optional)",
-  "monetizationType": "enum [FREE, LIVE_COMMERCE, LIVE_EVENT, MASTERCLASS, BRAND_SPONSORED]",
-  "price": "number (decimal, nullable - for LIVE_EVENT, MASTERCLASS)",
-  "currency": "string (ISO 4217, e.g., NGN, USD)",
-  "commissionPercentage": "number (decimal - from store subscription, NOT hardcoded)",
-  "status": "enum [DRAFT, SCHEDULED, LIVE, ENDED, CANCELLED]",
-  "byteplusStreamKey": "string (generated from BytePlus, encrypted)",
-  "byteplusPushUrl": "string (generated from BytePlus, encrypted)",
-  "byteplusPullUrl": "string (generated from BytePlus, encrypted)",
-  "byteplusStreamId": "string (BytePlus internal ID)",
-  "recordingEnabled": "boolean (default: false)",
-  "recordingUrl": "string (nullable - populated after stream ends)",
-  "maxViewers": "number (nullable - for MASTERCLASS)",
-  "currentViewers": "number (default: 0)",
-  "totalViews": "number (default: 0)",
-  "scheduledStartTime": "timestamp (nullable)",
-  "actualStartTime": "timestamp (nullable)",
-  "actualEndTime": "timestamp (nullable)",
-  "createdAt": "timestamp",
-  "updatedAt": "timestamp"
+**Implementation:**
+```typescript
+// Check before allowing stream creation
+async canCreateLiveStream(storeId: number) {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    include: { subscription: true }
+  })
+  
+  // 1. Must have verified store
+  if (!store?.verified) {
+    throw new ForbiddenException('Store must be verified to go live')
+  }
+  
+  // 2. Must have paid plan
+  if (store.subscriptionPlan === 'FREE') {
+    throw new ForbiddenException(
+      'Live streaming requires BASIC plan or higher. Upgrade now!'
+    )
+  }
+  
+  // 3. Check monthly limits
+  const limits = SUBSCRIPTION_LIMITS[store.subscriptionPlan]
+  const thisMonthStreams = await this.countStreamsThisMonth(storeId)
+  
+  if (limits.maxStreamsPerMonth > 0 && 
+      thisMonthStreams >= limits.maxStreamsPerMonth) {
+    throw new ForbiddenException(
+      `Monthly limit reached (${limits.maxStreamsPerMonth}). Upgrade to CLASSIC!`
+    )
+  }
+  
+  return true
 }
 ```
 
-**Indexes:**
-- `creatorId` (for creator's streams listing)
-- `storeId` (for store's streams - ADDED)
-- `status` (for active streams query)
-- `monetizationType` (for filtering)
-- `scheduledStartTime` (for upcoming streams)
+### Store Verification Requirements
+
+**EVERY live stream requires:**
+1. ✅ Verified store (StoreKYC approved by admin)
+2. ✅ Identity document on file
+3. ✅ Active subscription (BASIC or higher)
+4. ✅ At least 1 product in store (can pin during stream)
+
+**Why:** Prevents spam, scams, and builds trust
 
 ---
 
-### 2. `live_access` Table/Collection
+## 📊 Database Schema Changes
 
-Tracks who has paid/been granted access to a stream.
+### New Table: `live_streams`
 
-```json
-{
-  "id": "string (UUID)",
-  "streamId": "string (references live_streams.id)",
-  "userId": "string (user ID)",
-  "monetizationType": "enum (copied from stream)",
-  "accessGrantedAt": "timestamp",
-  "expiresAt": "timestamp (nullable - for time-limited sessions)",
-  "paymentId": "string (nullable - references payment transaction)",
-  "accessToken": "string (JWT or signed token for pull URL)",
-  "isActive": "boolean (default: true)",
-  "createdAt": "timestamp"
+```prisma
+model LiveStream {
+  id                    String                @id @default(uuid())
+  store                 Store                 @relation(fields: [storeId], references: [id])
+  storeId               Int                   // Links to existing Store
+  title                 String                @db.VarChar(100)
+  description           String?               @db.VarChar(500)
+  thumbnailUrl          String?
+  
+  // Monetization (uses store commission rate)
+  monetizationType      LiveMonetizationType  @default(LIVE_COMMERCE)
+  price                 Decimal?              @db.Decimal(10, 2)
+  currency              String                @default("NGN")
+  commissionPercentage  Decimal               // Copied from store subscription
+  
+  // BytePlus Integration
+  byteplusStreamKey     String                @unique
+  byteplusPushUrl       String
+  byteplusPullUrl       String
+  byteplusStreamId      String?
+  
+  // Stream State
+  status                LiveStreamStatus      @default(DRAFT)
+  scheduledStartTime    DateTime?
+  actualStartTime       DateTime?
+  actualEndTime         DateTime?
+  
+  // Metrics
+  currentViewers        Int                   @default(0)
+  totalViews            Int                   @default(0)
+  peakViewers           Int                   @default(0)
+  
+  // Settings
+  recordingEnabled      Boolean               @default(false)
+  recordingUrl          String?
+  maxViewers            Int?                  // For MASTERCLASS
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  // Relations
+  pinnedProducts        LiveProduct[]
+  viewers               LiveViewer[]
+  orders                Order[]               // Orders from this stream
+  
+  @@index([storeId, status])
+  @@index([status, actualStartTime])
+}
+
+enum LiveMonetizationType {
+  FREE              // Free to watch
+  LIVE_COMMERCE     // Product sales (main model)
+  LIVE_EVENT        // Paid ticket
+  MASTERCLASS       // Paid class
+  BRAND_SPONSORED   // Sponsored content
+}
+
+enum LiveStreamStatus {
+  DRAFT
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
 }
 ```
 
-**Indexes:**
-- `streamId + userId` (composite unique index)
-- `userId` (for user's purchased streams)
-- `accessToken` (for validation)
+### New Table: `live_products`
 
----
-
-### 3. `live_products` Table/Collection
-
-For LIVE_COMMERCE mode - products pinned during stream.
-
-```json
-{
-  "id": "string (UUID)",
-  "streamId": "string (references live_streams.id)",
-  "productId": "integer (references products.id) - CHANGED to integer for e-commerce integration",
-  "pinnedAt": "timestamp",
-  "unpinnedAt": "timestamp (nullable)",
-  "position": "number (display order)",
-  "specialPrice": "number (nullable - stream-specific pricing)",
-  "inventory": "number (nullable - stream-specific inventory)",
-  "soldCount": "number (default: 0)",
-  "isActive": "boolean (default: true)",
-  "createdAt": "timestamp"
+```prisma
+model LiveProduct {
+  id            String      @id @default(uuid())
+  liveStream    LiveStream  @relation(fields: [streamId], references: [id])
+  streamId      String
+  product       Product     @relation(fields: [productId], references: [id])
+  productId     Int         // Links to existing Product
+  
+  pinnedAt      DateTime    @default(now())
+  unpinnedAt    DateTime?
+  position      Int         @default(0)
+  
+  // Stream-specific pricing
+  specialPrice  Decimal?    @db.Decimal(10, 2)
+  soldCount     Int         @default(0)
+  
+  isActive      Boolean     @default(true)
+  
+  @@index([streamId, isActive])
+  @@index([productId])
 }
 ```
 
-**Indexes:**
-- `streamId + isActive` (composite)
-- `productId`
+### New Table: `live_viewers`
 
----
-
-### 4. `live_payments` Table/Collection
-
-Tracks payments for stream access (extends existing payment system).
-
-```json
-{
-  "id": "string (UUID)",
-  "streamId": "string (references live_streams.id)",
-  "userId": "string (user ID)",
-  "creatorId": "string (stream creator ID)",
-  "amount": "number (decimal)",
-  "currency": "string",
-  "platformFee": "number (decimal - calculated)",
-  "creatorEarning": "number (decimal - calculated)",
-  "paymentMethod": "string",
-  "paymentStatus": "enum [PENDING, COMPLETED, FAILED, REFUNDED]",
-  "transactionId": "string (payment gateway transaction ID)",
-  "paidAt": "timestamp (nullable)",
-  "createdAt": "timestamp"
+```prisma
+model LiveViewer {
+  id         String      @id @default(uuid())
+  liveStream LiveStream  @relation(fields: [streamId], references: [id])
+  streamId   String
+  user       User        @relation(fields: [userId], references: [id])
+  userId     Int
+  
+  joinedAt   DateTime    @default(now())
+  leftAt     DateTime?
+  duration   Int?        // Seconds watched
+  
+  // For paid streams
+  hasPaid    Boolean     @default(false)
+  paymentId  String?
+  
+  @@unique([streamId, userId])
+  @@index([streamId, joinedAt])
 }
 ```
 
-**Indexes:**
-- `streamId`
-- `userId`
-- `creatorId`
-- `paymentStatus`
+### Update Existing `Order` Model
 
----
-
-### 5. `live_replays` Table/Collection
-
-For recorded streams available for replay.
-
-```json
-{
-  "id": "string (UUID)",
-  "streamId": "string (references live_streams.id)",
-  "title": "string",
-  "recordingUrl": "string (BytePlus recording URL)",
-  "duration": "number (seconds)",
-  "thumbnailUrl": "string",
-  "monetizationType": "enum [FREE, PAID, BUNDLED]",
-  "price": "number (nullable)",
-  "currency": "string (nullable)",
-  "viewCount": "number (default: 0)",
-  "isPublished": "boolean (default: false)",
-  "publishedAt": "timestamp (nullable)",
-  "createdAt": "timestamp"
-}
-```
-
-**Indexes:**
-- `streamId`
-- `isPublished`
-
----
-
-### 6. `creator_plans` Table/Collection (Enhancement)
-
-**Add new fields to existing creator plans:**
-
-```json
-{
+```prisma
+model Order {
   // ... existing fields ...
-  "tier": "enum [FREE, STARTER, PRO, BUSINESS]",
-  "monthlyPrice": "number (0 for FREE, regional pricing for others)",
-  "liveStreamingEnabled": "boolean (default: false)",
-  "maxLiveStreamsPerMonth": "number (nullable - null = unlimited)",
-  "maxLiveStreamDuration": "number (minutes, nullable)",
-  "maxConcurrentStreams": "number (default: 1)",
-  "recordingEnabled": "boolean (default: false)",
-  "brandSponsorshipEnabled": "boolean (default: false)",
-  "commissionRate": "number (varies by tier: 10% free, 8% starter, 5% pro)"
+  
+  // NEW: Track live stream sales
+  orderSource   String?     // "LIVE_STREAM" or "REGULAR"
+  liveStream    LiveStream? @relation(fields: [streamId], references: [id])
+  streamId      String?
+  
+  @@index([orderSource, createdAt])
 }
 ```
 
-**Plan Examples for Nigeria:**
+### Update Existing `Store` Model
 
-**FREE TIER** (₦0/month)
-- `liveStreamingEnabled: true` ✅ Changed - allow free testing
-- `maxLiveStreamsPerMonth: 3`
-- `maxLiveStreamDuration: 30` (minutes)
-- `recordingEnabled: false`
-- `commissionRate: 10%`
-- Purpose: Test and build audience
-
-**STARTER TIER** (₦5,000-10,000/month ≈ $10-20)
-- `liveStreamingEnabled: true`
-- `maxLiveStreamsPerMonth: null` (unlimited)
-- `maxLiveStreamDuration: 180` (3 hours)
-- `recordingEnabled: true`
-- `commissionRate: 8%`
-- `maxConcurrentStreams: 2`
-
-**PRO TIER** (₦25,000-50,000/month ≈ $50-100)
-- All Starter features
-- `commissionRate: 5%` ✅ Lower for serious creators
-- `brandSponsorshipEnabled: true`
-- Advanced analytics
-- Priority support
-
-**BUSINESS TIER** (Custom pricing)
-- All Pro features
-- `commissionRate: negotiable (3-5%)`
-- Dedicated account manager
-- Custom integrations
-
----
-
-### 7. `regional_config` Table/Collection (NEW)
-
-Store region-specific settings for pricing and commissions.
-
-```json
-{
-  "id": "string (UUID)",
-  "region": "string (ISO country code, e.g., NG, GH, KE, ZA)",
-  "currency": "string (NGN, GHS, KES, ZAR)",
-  "defaultCommissionRate": "number (5-10% for Africa)",
-  "paymentProviders": "array [Paystack, Flutterwave, etc.]",
-  "minimumPayout": "number (in local currency)",
-  "isActive": "boolean",
-  "createdAt": "timestamp"
+```prisma
+model Store {
+  // ... existing fields ...
+  
+  // NEW: Live streaming relation
+  liveStreams   LiveStream[]
 }
 ```
-
-**Example Configurations:**
-
-**Nigeria (NG)**
-- Currency: NGN
-- Default commission: 8%
-- Payment providers: [Paystack, Flutterwave, Bank Transfer]
-- Minimum payout: ₦5,000
-
-**Ghana (GH)**
-- Currency: GHS
-- Default commission: 8%
-- Payment providers: [Paystack, Flutterwave, Mobile Money]
-- Minimum payout: GH₵50
-
-**Kenya (KE)**
-- Currency: KES
-- Default commission: 9%
-- Payment providers: [Flutterwave, M-Pesa]
-- Minimum payout: KES 500
-
-**South Africa (ZA)**
-- Currency: ZAR
-- Default commission: 10%
-- Payment providers: [Paystack, Flutterwave, Card]
-- Minimum payout: R100
 
 ---
 
@@ -1363,6 +1306,351 @@ SecretAccessKey: your_secret_key
 - **BytePlus OpenAPI Docs:** Provided by BytePlus (requires account)
 - **BytePlus Server SDKs:** Java, Python, Go, PHP available
 - **License File Location:** `~/Downloads/l-1905778193-ch-fcdn_byteplus-a-918011.lic`
+
+---
+
+## 🛒 MISSING E-COMMERCE ENDPOINTS (NOT YET IMPLEMENTED)
+
+**Status:** These 14 endpoints return **404 Not Found** and need to be implemented.
+
+### Base URL: `https://api.lykluk.com`
+
+---
+
+### 📂 CATEGORIES (3 endpoints) - NOT IMPLEMENTED
+
+#### 1. Get All Categories
+```
+GET /categories
+```
+**Description:** Get all product categories with hierarchy
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Electronics",
+      "slug": "electronics",
+      "parentId": null,
+      "icon": "https://...",
+      "productCount": 1234,
+      "children": [
+        {
+          "id": 2,
+          "name": "Smartphones",
+          "slug": "smartphones",
+          "parentId": 1,
+          "productCount": 456
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### 2. Get Root Categories
+```
+GET /categories/root
+```
+**Description:** Get only top-level categories (parentId is null)
+**Response:** Same structure as above, but filtered to root categories only
+
+#### 3. Get Category by ID
+```
+GET /categories/{id}
+```
+**Description:** Get single category with all details and subcategories
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Electronics",
+    "slug": "electronics",
+    "description": "Electronic devices and accessories",
+    "icon": "https://...",
+    "productCount": 1234,
+    "children": [...],
+    "products": [...]
+  }
+}
+```
+
+---
+
+### 🚚 LOGISTICS & CARRIERS (11 endpoints) - NOT IMPLEMENTED
+
+#### 1. Get Available Carriers
+```
+GET /logistics/carriers
+```
+**Description:** Get all available shipping carriers
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "fedex",
+      "name": "FedEx",
+      "description": "Fast and reliable worldwide shipping",
+      "logo": "https://...",
+      "deliveryTime": "2-3 days",
+      "baseRate": 9.99,
+      "supported": true
+    }
+  ]
+}
+```
+
+#### 2. Get Carrier Details
+```
+GET /logistics/carriers/{id}
+```
+**Description:** Get detailed information about a specific carrier
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "fedex",
+    "name": "FedEx",
+    "description": "Fast and reliable worldwide shipping",
+    "logo": "https://...",
+    "features": ["tracking", "insurance", "signature"],
+    "deliveryTimes": {
+      "domestic": "2-3 days",
+      "international": "5-7 days"
+    },
+    "rates": {
+      "base": 9.99,
+      "perKg": 2.50
+    }
+  }
+}
+```
+
+#### 3. Get Recommended Carriers
+```
+GET /logistics/carriers/recommend
+Query Params: ?weight=5&destination=US&origin=NG
+```
+**Description:** Get recommended carriers based on order parameters
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "recommended": [
+      {
+        "carrierId": "fedex",
+        "estimatedCost": 25.99,
+        "estimatedDays": 3,
+        "confidence": 0.95
+      }
+    ]
+  }
+}
+```
+
+#### 4. Get Store Configured Carriers
+```
+GET /logistics/stores/{storeId}/carriers
+```
+**Description:** Get carriers configured for a specific store
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "storeId": 42,
+    "carriers": ["fedex", "ups", "dhl"],
+    "defaultCarrier": "fedex",
+    "preferences": {...}
+  }
+}
+```
+
+#### 5. Add Logistics Preference
+```
+POST /store/logistics/preferences
+Authorization: Bearer <token>
+```
+**Request Body:**
+```json
+{
+  "name": "Domestic Standard",
+  "description": "Standard shipping for domestic orders",
+  "carrierId": "fedex",
+  "zone": "US",
+  "weightLimit": 50,
+  "isActive": true
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "storeId": 42,
+    "name": "Domestic Standard",
+    "createdAt": "2025-12-19T10:00:00Z"
+  }
+}
+```
+
+#### 6. Get Store Logistics Preferences
+```
+GET /store/logistics/preferences
+Authorization: Bearer <token>
+```
+**Description:** Get all logistics preferences for authenticated store
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "storeId": 42,
+      "name": "Domestic Standard",
+      "description": "Standard shipping for domestic orders",
+      "carrierId": "fedex",
+      "zone": "US",
+      "weightLimit": 50,
+      "isActive": true
+    }
+  ]
+}
+```
+
+#### 7. Update Logistics Preference
+```
+PUT /store/logistics/preferences/{id}
+Authorization: Bearer <token>
+```
+**Request Body:** Same as Add (partial update supported)
+**Response:** Updated preference object
+
+#### 8. Delete Logistics Preference
+```
+DELETE /store/logistics/preferences/{id}
+Authorization: Bearer <token>
+```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Preference deleted successfully"
+}
+```
+
+#### 9. Set Preferred Carriers
+```
+PUT /store/logistics/preferred
+Authorization: Bearer <token>
+```
+**Request Body:**
+```json
+{
+  "carrierIds": ["fedex", "ups", "dhl"]
+}
+```
+**Description:** Set the store's preferred carriers in priority order
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "storeId": 42,
+    "preferredCarriers": ["fedex", "ups", "dhl"],
+    "updatedAt": "2025-12-19T10:00:00Z"
+  }
+}
+```
+
+---
+
+### ⚕️ HEALTH CHECK (1 endpoint) - NOT IMPLEMENTED
+
+#### Health Check
+```
+GET /health
+```
+**Description:** API health status check (for monitoring/DevOps)
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-12-19T10:00:00Z",
+  "services": {
+    "database": "healthy",
+    "redis": "healthy",
+    "storage": "healthy"
+  },
+  "version": "1.0.0"
+}
+```
+
+---
+
+## 📊 Implementation Priority
+
+### HIGH PRIORITY (Needed for MVP):
+1. ✅ **Categories** - Required for product browsing/filtering
+2. ✅ **Health Check** - Required for monitoring
+
+### MEDIUM PRIORITY (Enhance UX):
+3. ✅ **Basic Logistics** - Get carriers, store carriers
+4. ⚠️ **Carrier Recommendations** - Nice to have (can use basic selection first)
+
+### LOW PRIORITY (Advanced Features):
+5. ⚠️ **Logistics Preferences** - Can be added after MVP
+6. ⚠️ **Preferred Carriers** - Store configuration feature
+
+---
+
+## 🧪 Testing Status
+
+| Endpoint Group | Status | Test Date | Result |
+|----------------|--------|-----------|--------|
+| Store Management | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Product Management | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Cart | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Orders | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Subscriptions | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Social | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Recommendations | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Analytics | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| Addresses | ✅ Working | 2025-12-19 | 401 (Authenticated) |
+| **Categories** | ❌ Not Implemented | 2025-12-19 | **404** |
+| **Logistics** | ❌ Not Implemented | 2025-12-19 | **404** |
+| **Health Check** | ❌ Not Implemented | 2025-12-19 | **404** |
+
+**Note:** 401 responses mean endpoints exist and require authentication (working correctly). 404 means endpoints don't exist yet.
+
+---
+
+## 📋 Backend Team Action Items
+
+### Immediate (This Week):
+- [ ] Implement `/categories` endpoints (3 endpoints)
+- [ ] Implement `/health` endpoint (1 endpoint)
+- [ ] Add category seeding/migration with basic categories
+
+### Next Sprint:
+- [ ] Implement basic `/logistics/carriers` endpoints (2 endpoints)
+- [ ] Implement `/logistics/stores/{id}/carriers` endpoint
+- [ ] Add carrier configuration to store settings
+
+### Future (Post-MVP):
+- [ ] Implement logistics preferences endpoints (5 endpoints)
+- [ ] Implement carrier recommendation algorithm
+- [ ] Add rate calculation API
 
 ---
 
