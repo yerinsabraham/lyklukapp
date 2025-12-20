@@ -1,19 +1,132 @@
-# Backend Requirements: BytePlus MediaLive & E-Commerce Integration
+# Backend Requirements: BytePlus MediaLive Integration
 
-**Date:** December 19, 2025 (Updated - Added Missing E-Commerce Endpoints)  
+**Date:** December 20, 2025  
 **For:** Backend Development Team  
-**Project:** LykLuk Live Streaming + E-Commerce Platform  
-**Status:** ⚠️ 14 E-Commerce Endpoints Pending Implementation
+**Project:** LykLuk Live Streaming Platform (Multi-Purpose: Commerce, Social, Podcasts)  
+**Status:** ⚠️ MediaLive Core Module Pending Implementation
 
 ---
 
 ## 🎯 Overview
 
-This document specifies all backend requirements for:
-1. **BytePlus MediaLive** integration for live streaming
-2. **Missing E-Commerce Endpoints** that need implementation (Categories, Logistics, Health Check)
+This document specifies backend requirements for **BytePlus MediaLive integration** - a **unified live streaming infrastructure** that supports multiple use cases:
 
-Live streaming is implemented as a **premium e-commerce feature** under `/api/v1/ecommerce/live`.
+1. **Live Commerce** - Store owners selling products via livestream
+2. **Social Live** - Users going live for social engagement (like Instagram/TikTok Live)
+3. **Podcasts** - Audio-only live sessions and recordings (future)
+
+### Architecture Philosophy
+
+**MediaLive is a STANDALONE MODULE** that provides streaming infrastructure:
+```
+Backend Services:
+├── /live/*              ← Core MediaLive service (SHARED INFRASTRUCTURE)
+│   ├── BytePlus integration
+│   ├── Stream management
+│   ├── Viewer access control
+│   └── Recording & replays
+│
+├── /ecommerce/*         ← E-commerce features
+│   └── Uses /live/* for commerce streams
+│
+└── /social/*            ← Social features  
+    └── Uses /live/* for social streams
+```
+
+**Key Principle:** One BytePlus account, multiple stream types, different authorization rules.
+
+---
+
+## 🏗️ Architecture Layers Explained
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  FLUTTER APP (Frontend)                                         │
+├─────────────────────────────────────────────────────────────────┤
+│  lib/modules/live_stream/                                       │
+│  └─ Calls API Routes via HTTP/WebSocket                        │
+└─────────────────────────────────────────────────────────────────┘
+                          ↓ HTTP Requests
+┌─────────────────────────────────────────────────────────────────┐
+│  API ROUTES (Backend Endpoints)                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  /live/*                  ← Core streaming (ALL types)          │
+│  /live/commerce/*         ← Store features (COMMERCE only)      │
+│  /live/social/*           ← Social features (SOCIAL only)       │
+└─────────────────────────────────────────────────────────────────┘
+                          ↓ Business Logic
+┌─────────────────────────────────────────────────────────────────┐
+│  SERVICES (Backend Code)                                        │
+├─────────────────────────────────────────────────────────────────┤
+│  live.service.ts          ← Stream management logic             │
+│  byteplus.service.ts      ← BytePlus API calls                 │
+│  commerce-live.service.ts ← Product pinning, sales tracking    │
+│  social-live.service.ts   ← Gifts, comments, engagement        │
+└─────────────────────────────────────────────────────────────────┘
+                          ↓ Database Queries
+┌─────────────────────────────────────────────────────────────────┐
+│  DATABASE TABLES (Storage)                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  live_streams       ← Metadata (ALL types)                      │
+│  live_viewers       ← Viewer tracking (ALL types)               │
+│  live_payments      ← Transactions (ALL types)                  │
+│  live_analytics     ← Metrics (ALL types)                       │
+│  live_comments      ← Chat (ALL types)                          │
+│  live_products      ← Product pins (COMMERCE only)              │
+│  live_gifts         ← Virtual gifts (SOCIAL only)               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Example Flow: User Creates Commerce Stream
+
+```
+1. Flutter App calls:
+   POST /live/create
+   {
+     "streamType": "COMMERCE",
+     "storeId": 123,
+     "title": "Flash Sale"
+   }
+
+2. Backend validates:
+   - Check user owns store (query: stores table)
+   - Check store verified (query: stores table)
+   - Check subscription (query: /ecommerce/subscription/*)
+   
+3. Backend calls BytePlus API:
+   - Get push URL and stream key
+   
+4. Backend stores in database:
+   INSERT INTO live_streams (
+     stream_type = 'COMMERCE',
+     creator_store_id = 123,
+     title = 'Flash Sale',
+     ...
+   )
+   
+5. Backend returns to Flutter:
+   {
+     "streamId": "uuid",
+     "pushUrl": "rtmp://...",
+     "streamKey": "abc123"
+   }
+```
+
+### Example: User Pins Product During Stream
+
+```
+1. Flutter App calls:
+   POST /live/{streamId}/pin-product
+   { "productId": 456 }
+
+2. Backend uses MULTIPLE tables:
+   - Query live_streams (check stream exists, is COMMERCE type)
+   - Query products (get product details from /ecommerce/products)
+   - INSERT INTO live_products (streamId, productId, ...)
+   
+3. Backend broadcasts via WebSocket:
+   → All viewers see product card appear
+```
 
 ---
 
@@ -52,13 +165,10 @@ Live streaming is implemented as a **premium e-commerce feature** under `/api/v1
 - [Testing Requirements](#-testing-requirements)
 - [BytePlus OpenAPI Integration](#-byteplus-openapi-integration)
 
-### Missing E-Commerce Endpoints
-- [Missing E-Commerce Endpoints Overview](#-missing-e-commerce-endpoints-not-yet-implemented)
-  - [Categories Endpoints (3)](#-categories-3-endpoints---not-implemented)
-  - [Logistics & Carriers Endpoints (11)](#-logistics--carriers-11-endpoints---not-implemented)
-  - [Health Check Endpoint (1)](#️-health-check-1-endpoint---not-implemented)
+### Additional Requirements
+- [Categories Endpoints (3)](#-categories-3-endpoints---needed-for-content-organization)
+- [Health Check Endpoint (1)](#️-health-check-1-endpoint---for-monitoring)
 - [Implementation Priority](#-implementation-priority)
-- [Testing Status](#-testing-status)
 - [Backend Team Action Items](#-backend-team-action-items)
 
 ### Resources & Deployment
@@ -69,32 +179,971 @@ Live streaming is implemented as a **premium e-commerce feature** under `/api/v1
 ---
 
 ### Architecture Decision
-**Live streaming is NOT a separate service** - it's a module within the e-commerce service:
+
+**MediaLive is a STANDALONE service/module:**
+
 ```
-e-commerce/
-├── src/
-│   ├── store/          # Existing
-│   ├── product/        # Existing
-│   ├── order/          # Existing
-│   ├── subscription/   # Existing
-│   └── live/           # NEW: Live streaming module
-│       ├── live.controller.ts
-│       ├── live.service.ts
-│       ├── live.module.ts
-│       └── dto/
+Backend Architecture:
+
+1. CORE LIVE MODULE (/live/*)
+   ├── live.controller.ts
+   ├── live.service.ts
+   ├── byteplus.service.ts      ← BytePlus OpenAPI integration
+   ├── stream.repository.ts
+   └── dto/
+       ├── create-stream.dto.ts
+       ├── stream-access.dto.ts
+       └── stream-response.dto.ts
+
+2. COMMERCE INTEGRATION (/ecommerce/live/* or /live/commerce/*)
+   ├── commerce-live.controller.ts
+   ├── commerce-live.service.ts
+   └── Uses /live/* core + adds:
+       - Store verification checks
+       - Subscription validation
+       - Product pinning
+       - Commission tracking
+
+3. SOCIAL INTEGRATION (/social/live/* or /live/social/*)
+   ├── social-live.controller.ts
+   ├── social-live.service.ts
+   └── Uses /live/* core + adds:
+       - Follower notifications
+       - Virtual gifts
+       - Live comments
+       - Social graph integration
+
+4. PODCAST INTEGRATION (future: /live/podcast/*)
+   ├── podcast-live.controller.ts
+   └── Uses /live/* core + adds:
+       - Audio-only mode
+       - RSS feed generation
+       - Episode management
 ```
 
-### Core Principles
-1. ✅ **Requires verified store** (uses existing StoreKYC)
-2. ✅ **Subscription-gated** (FREE can't stream, BASIC+ only)
-3. ✅ **Store-based monetization** (uses existing commission rates)
-4. ✅ **Product pinning** (references existing products)
-5. ✅ **Analytics integration** (extends existing dashboard)
-6. ✅ **BytePlus OpenAPI** (server-side stream management)
+### Stream Type Differentiation
+
+Each stream has a `streamType` field:
+
+```typescript
+enum StreamType {
+  COMMERCE = 'COMMERCE',  // Store owner selling products
+  SOCIAL = 'SOCIAL',      // User going live for engagement
+  PODCAST = 'PODCAST',    // Audio-only session
+}
+```
+
+**Authorization rules vary by type:**
+- **COMMERCE**: Requires verified store + paid subscription
+- **SOCIAL**: Any verified user can go live
+- **PODCAST**: Verified creators only (future)
+
+### Database Schema
+
+```sql
+CREATE TABLE live_streams (
+  id UUID PRIMARY KEY,
+  stream_type VARCHAR(20) NOT NULL,  -- 'COMMERCE' | 'SOCIAL' | 'PODCAST'
+  
+  -- Creator (flexible - can be user OR store)
+  creator_user_id UUID,              -- For social/podcast
+  creator_store_id INT,              -- For commerce
+  
+  -- Stream details
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  thumbnail_url VARCHAR(500),
+  
+  -- BytePlus credentials
+  byteplus_stream_key VARCHAR(255),
+  byteplus_push_url VARCHAR(500),
+  byteplus_pull_url VARCHAR(500),
+  
+  -- Status
+  status VARCHAR(20) NOT NULL,       -- 'DRAFT' | 'LIVE' | 'ENDED'
+  scheduled_start_time TIMESTAMP,
+  actual_start_time TIMESTAMP,
+  actual_end_time TIMESTAMP,
+  
+  -- Monetization (varies by type)
+  monetization_type VARCHAR(50),
+  price DECIMAL(10, 2),
+  currency VARCHAR(3),
+  
+  -- Analytics
+  current_viewers INT DEFAULT 0,
+  total_views INT DEFAULT 0,
+  peak_viewers INT DEFAULT 0,
+  
+  -- Recording
+  recording_enabled BOOLEAN DEFAULT false,
+  recording_url VARCHAR(500),
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  
+  -- Constraints
+  CONSTRAINT check_creator CHECK (
+    (creator_user_id IS NOT NULL AND creator_store_id IS NULL AND stream_type IN ('SOCIAL', 'PODCAST'))
+    OR
+    (creator_store_id IS NOT NULL AND creator_user_id IS NULL AND stream_type = 'COMMERCE')
+  )
+);
+```
 
 ---
 
-## 🔗 E-Commerce Integration (CRITICAL)
+## 📍 Quick Reference: Routes vs Tables
+
+**To answer "which subdomain are live_streams, live_viewers, live_payments implemented?"**
+
+👉 **These are DATABASE TABLES, not subdomains or API routes!**
+
+They're stored in PostgreSQL/MySQL on the backend server. The frontend never calls them directly.
+
+### Here's What the Frontend Actually Calls:
+
+| What User Sees | Frontend Calls (Route) | Database Tables Used |
+|----------------|------------------------|---------------------|
+| Create commerce stream | `POST https://api.lykluk.com/live/create` | `live_streams` |
+| Create social stream | `POST https://api.lykluk.com/live/create` | `live_streams` |
+| Watch live stream | `GET https://api.lykluk.com/live/{id}` | `live_streams`, `live_viewers` |
+| Pin product | `POST https://api.lykluk.com/live/commerce/{id}/pin-product` | `live_products`, `live_streams` |
+| Send gift | `POST https://api.lykluk.com/live/social/{id}/gift` | `live_gifts`, `live_payments` |
+| Send comment | `POST https://api.lykluk.com/live/{id}/comment` | `live_comments` |
+| View analytics | `GET https://api.lykluk.com/live/{id}/analytics` | `live_analytics`, `live_streams` |
+| Buy event ticket | `POST https://api.lykluk.com/live/{id}/purchase` | `live_payments`, `live_viewers` |
+
+### ⚡ Key Points:
+
+1. **There's only ONE domain:** `https://api.lykluk.com`
+2. **All live features use `/live/*` routes** (no separate subdomains)
+3. **Database tables are shared** by ALL stream types (commerce, social, podcast)
+4. **The `stream_type` column** differentiates between stream types in the database
+5. **Tables are INTERNAL** - your Flutter app never sees them, only the backend does
+
+### Architecture:
+
+```
+Flutter App
+    ↓ (calls)
+https://api.lykluk.com/live/create
+    ↓ (processed by)
+Backend Service (live.service.ts)
+    ↓ (queries/inserts)
+Database Table: live_streams
+```
+
+**No subdomains involved!** Everything is at `api.lykluk.com/live/*` and stores to the same database.
+
+---
+
+## � Core API Endpoints (Shared Infrastructure)
+
+**Base:** `/live/*` (stream type agnostic)
+
+### 1. Create Stream (Universal)
+```
+POST /live/create
+Authorization: Bearer <user_token>
+```
+
+**Request:**
+```json
+{
+  "streamType": "COMMERCE" | "SOCIAL" | "PODCAST",
+  "title": "My Live Stream",
+  "description": "Stream description",
+  "thumbnailUrl": "https://...",
+  "monetizationType": "FREE" | "LIVE_COMMERCE" | "LIVE_EVENT" | "MASTERCLASS",
+  "price": 9.99,              // Optional
+  "currency": "NGN",
+  "recordingEnabled": true,
+  "scheduledStartTime": "2025-12-20T19:00:00Z",
+  
+  // Type-specific fields
+  "storeId": 123,             // Required if streamType = COMMERCE
+  "maxViewers": 100           // Optional for MASTERCLASS
+}
+```
+
+**Business Logic:**
+```typescript
+async createStream(userId: string, dto: CreateStreamDto) {
+  // 1. Validate based on stream type
+  if (dto.streamType === 'COMMERCE') {
+    // Check user owns store
+    await this.validateStoreOwnership(userId, dto.storeId);
+    // Check store is verified
+    await this.validateStoreVerified(dto.storeId);
+    // Check subscription tier
+    await this.validateSubscription(dto.storeId);
+  } else if (dto.streamType === 'SOCIAL') {
+    // Check user is verified
+    await this.validateUserVerified(userId);
+    // Optional: Check user reputation/limits
+  }
+  
+  // 2. Call BytePlus API to get stream credentials
+  const byteplusResponse = await this.byteplusService.createLiveStream({
+    streamId: generateUniqueId(),
+  });
+  
+  // 3. Store in database
+  const stream = await this.streamRepository.create({
+    ...dto,
+    creatorUserId: dto.streamType === 'SOCIAL' ? userId : null,
+    creatorStoreId: dto.streamType === 'COMMERCE' ? dto.storeId : null,
+    byteplusStreamKey: byteplusResponse.streamKey,
+    byteplusPushUrl: byteplusResponse.pushUrl,
+    byteplusPullUrl: byteplusResponse.pullUrl,
+    status: 'DRAFT',
+  });
+  
+  return {
+    streamId: stream.id,
+    pushUrl: stream.byteplusPushUrl,
+    streamKey: stream.byteplusStreamKey,
+    status: stream.status,
+  };
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "streamId": "uuid",
+    "pushUrl": "rtmp://push.byteplus.com/live/abc123",
+    "streamKey": "secret_key_xyz",
+    "status": "DRAFT",
+    "expiresAt": "2025-12-21T19:00:00Z"
+  }
+}
+```
+
+---
+
+### 2. Start Stream
+```
+POST /live/{streamId}/start
+Authorization: Bearer <user_token>
+```
+
+**Logic:**
+- Verify user is the stream creator
+- Update status to LIVE
+- Notify followers/store followers (based on stream type)
+- Return pull URL for viewers
+
+---
+
+### 3. End Stream
+```
+POST /live/{streamId}/end
+Authorization: Bearer <user_token>
+```
+
+**Logic:**
+- Verify user is the stream creator
+- Call BytePlus API to stop stream
+- Update status to ENDED
+- Trigger recording processing (if enabled)
+- Calculate analytics
+
+---
+
+### 4. Get Active Streams
+```
+GET /live/active?type=COMMERCE|SOCIAL&page=1&limit=20
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "streams": [
+      {
+        "streamId": "uuid",
+        "streamType": "COMMERCE",
+        "title": "Flash Sale Live",
+        "thumbnailUrl": "https://...",
+        "creatorName": "Fashion Store",
+        "creatorAvatar": "https://...",
+        "currentViewers": 234,
+        "monetizationType": "LIVE_COMMERCE"
+      },
+      {
+        "streamId": "uuid2",
+        "streamType": "SOCIAL",
+        "title": "Just Chatting",
+        "creatorName": "John Doe",
+        "currentViewers": 45,
+        "monetizationType": "FREE"
+      }
+    ],
+    "pagination": {
+      "total": 15,
+      "page": 1,
+      "limit": 20
+    }
+  }
+}
+```
+
+---
+
+### 5. Get Stream Details
+```
+GET /live/{streamId}
+```
+
+**Response includes type-specific data:**
+```json
+{
+  "success": true,
+  "data": {
+    "streamId": "uuid",
+    "streamType": "COMMERCE",
+    "title": "Live Sale",
+    "description": "...",
+    "status": "LIVE",
+    "currentViewers": 234,
+    "monetizationType": "LIVE_COMMERCE",
+    
+    // COMMERCE-specific fields
+    "storeId": 123,
+    "storeName": "Fashion Hub",
+    "pinnedProduct": {
+      "id": 456,
+      "name": "T-Shirt",
+      "price": 29.99,
+      "imageUrl": "https://..."
+    },
+    
+    // SOCIAL-specific fields (if type=SOCIAL)
+    "creatorUserId": "uuid",
+    "creatorFollowers": 1200
+  }
+}
+```
+
+---
+
+## 🛒 Commerce-Specific Endpoints
+
+**Base:** `/live/commerce/*` or `/ecommerce/live/*`
+
+### Pin Product During Stream
+```
+POST /live/{streamId}/pin-product
+Authorization: Bearer <store_owner_token>
+```
+
+**Request:**
+```json
+{
+  "productId": 456
+}
+```
+
+**Validation:**
+- Stream must be type COMMERCE
+- User must own the store
+- Product must belong to the store
+
+---
+
+### Get Commerce Stream Analytics
+```
+GET /live/commerce/{streamId}/analytics
+Authorization: Bearer <store_owner_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalRevenue": 1250.00,
+    "orderCount": 23,
+    "averageOrderValue": 54.35,
+    "productsSold": [
+      {"productId": 456, "name": "T-Shirt", "quantity": 12, "revenue": 359.88}
+    ],
+    "viewerEngagement": {
+      "peakViewers": 345,
+      "averageWatchTime": "4m 32s"
+    }
+  }
+}
+```
+
+---
+
+## � API Response Requirements - What Frontend Needs
+
+### 1. Create Stream Response
+
+**POST /live/create → Must return:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "streamId": "uuid",                    // For all subsequent API calls
+    "pushUrl": "rtmp://push.example.com/live/abc123",
+    "streamKey": "secret_key_xyz",         // SENSITIVE - handle securely
+    "pullUrl": "https://pull.example.com/live/abc123.flv",
+    "status": "DRAFT",
+    "monetizationType": "LIVE_COMMERCE",
+    "expiresAt": "2025-12-21T19:00:00Z",
+    
+    // Metadata for UI
+    "title": "My Live Stream",
+    "thumbnailUrl": "https://...",
+    
+    // For analytics display
+    "streamType": "COMMERCE",
+    "currentViewers": 0,
+    "totalViews": 0
+  }
+}
+```
+
+---
+
+### 2. Get Stream Details Response
+
+**GET /live/{streamId} → Must return complete metadata:**
+
+```json
+{
+  "success": true,
+  "data": {
+    // Core Info
+    "streamId": "uuid",
+    "streamType": "COMMERCE" | "SOCIAL" | "PODCAST",
+    "title": "Flash Sale Live",
+    "description": "20% off everything!",
+    "thumbnailUrl": "https://...",
+    "status": "LIVE",
+    
+    // Timing
+    "scheduledStartTime": "2025-12-20T19:00:00Z",
+    "actualStartTime": "2025-12-20T19:02:15Z",
+    "actualEndTime": null,
+    "streamDurationSeconds": 3600,
+    
+    // Creator Info (type-dependent)
+    "creator": {
+      // For COMMERCE streams:
+      "type": "store",
+      "storeId": 123,
+      "storeName": "Fashion Hub",
+      "storeAvatar": "https://...",
+      "storeVerified": true,
+      
+      // For SOCIAL streams:
+      "type": "user",
+      "userId": "uuid",
+      "username": "johndoe",
+      "displayName": "John Doe",
+      "avatar": "https://...",
+      "verified": true,
+      "followerCount": 1200
+    },
+    
+    // Real-time Metrics
+    "currentViewers": 234,
+    "totalViews": 1520,
+    "peakViewers": 345,
+    "totalLikes": 450,
+    "totalComments": 89,
+    
+    // Monetization
+    "monetizationType": "LIVE_COMMERCE",
+    "price": 9.99,
+    "currency": "NGN",
+    "requiresPayment": false,
+    
+    // Viewer's Access (if authenticated)
+    "viewerAccess": {
+      "hasAccess": true,
+      "accessType": "FREE",
+      "joinedAt": "2025-12-20T19:05:00Z",
+      "watchDurationSeconds": 180
+    },
+    
+    // Stream URLs
+    "pullUrl": "https://pull.example.com/live/abc123.flv",  // HLS/FLV URL
+    
+    // COMMERCE-specific fields
+    "pinnedProduct": {
+      "productId": 456,
+      "name": "Cotton T-Shirt",
+      "description": "Comfortable cotton tee",
+      "price": 29.99,
+      "specialPrice": 23.99,
+      "discountPercentage": 20,
+      "imageUrl": "https://...",
+      "inStock": true,
+      "stockCount": 50
+    },
+    
+    // Settings
+    "recordingEnabled": true,
+    "allowComments": true,
+    "allowGifts": true,
+    "maxViewers": null,
+    
+    // Category & Discovery
+    "categoryId": 2,
+    "categoryName": "Fashion",
+    "tags": ["fashion", "sale", "clothing"],
+    "language": "en"
+  }
+}
+```
+
+---
+
+### 3. Get Active Streams Response
+
+**GET /live/active?type=COMMERCE&page=1&limit=20 → Must return list with preview data:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "streams": [
+      {
+        "streamId": "uuid",
+        "streamType": "COMMERCE",
+        "title": "Flash Sale Live",
+        "description": "Short preview...",
+        "thumbnailUrl": "https://...",
+        "status": "LIVE",
+        
+        // Creator preview
+        "creator": {
+          "name": "Fashion Hub",
+          "avatar": "https://...",
+          "verified": true
+        },
+        
+        // Metrics for discovery
+        "currentViewers": 234,
+        "totalViews": 1520,
+        "startedAt": "2025-12-20T19:00:00Z",
+        
+        // Monetization
+        "monetizationType": "LIVE_COMMERCE",
+        "isFree": true,
+        
+        // Preview info
+        "categoryName": "Fashion",
+        "tags": ["sale", "clothing"],
+        "language": "en"
+      }
+    ],
+    "pagination": {
+      "total": 45,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 3
+    }
+  }
+}
+```
+
+---
+
+### 4. Stream Analytics Response
+
+**GET /live/{streamId}/analytics → Must return comprehensive metrics:**
+
+```json
+{
+  "success": true,
+  "data": {
+    // Overview
+    "streamId": "uuid",
+    "streamType": "COMMERCE",
+    "status": "ENDED",
+    "duration": "1h 15m",
+    
+    // Viewer Metrics
+    "viewers": {
+      "total": 1520,
+      "unique": 890,
+      "peak": 345,
+      "average": 210,
+      "averageWatchTime": "4m 32s",
+      "totalWatchTime": "95h 12m"
+    },
+    
+    // Engagement
+    "engagement": {
+      "totalLikes": 450,
+      "totalComments": 289,
+      "totalShares": 34,
+      "engagementRate": 15.2  // Percentage
+    },
+    
+    // Geographic Distribution
+    "geography": {
+      "topCountries": [
+        {"code": "NG", "name": "Nigeria", "viewers": 650},
+        {"code": "GH", "name": "Ghana", "viewers": 120},
+        {"code": "KE", "name": "Kenya", "viewers": 80}
+      ],
+      "topCities": [
+        {"name": "Lagos", "viewers": 450},
+        {"name": "Accra", "viewers": 95}
+      ]
+    },
+    
+    // Devices
+    "devices": {
+      "mobile": 75,       // Percentage
+      "desktop": 20,
+      "tablet": 5
+    },
+    
+    // Revenue (COMMERCE only)
+    "revenue": {
+      "totalRevenue": 1250.50,
+      "totalOrders": 23,
+      "averageOrderValue": 54.37,
+      "conversionRate": 2.6,  // (orders / viewers) * 100
+      "productsSold": [
+        {
+          "productId": 456,
+          "name": "Cotton T-Shirt",
+          "quantitySold": 12,
+          "revenue": 287.88,
+          "viewCount": 890,
+          "clickCount": 234,
+          "conversionRate": 5.1
+        }
+      ]
+    },
+    
+    // Gifts (SOCIAL only)
+    "gifts": {
+      "totalGifts": 145,
+      "totalValue": 450.00,
+      "currency": "NGN",
+      "topGiftTypes": [
+        {"type": "rose", "count": 45, "value": 135.00},
+        {"type": "heart", "count": 100, "value": 100.00}
+      ],
+      "topSenders": [
+        {
+          "userId": "uuid",
+          "username": "viewer123",
+          "giftsSent": 25,
+          "totalValue": 75.00
+        }
+      ]
+    },
+    
+    // Timeline (hourly breakdown)
+    "timeline": [
+      {
+        "hour": "19:00",
+        "viewers": 120,
+        "engagement": 34,
+        "revenue": 125.50
+      },
+      {
+        "hour": "20:00",
+        "viewers": 345,
+        "engagement": 89,
+        "revenue": 487.25
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 5. Viewer Access Request Response
+
+**POST /live/{streamId}/access → Must return access decision:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "streamId": "uuid",
+    "accessGranted": true,
+    "accessType": "FREE",        // 'FREE', 'PAID', 'GIFT'
+    
+    // Stream URLs (if access granted)
+    "pullUrl": "https://pull.example.com/live/abc123.flv",
+    "pullUrlHLS": "https://pull.example.com/live/abc123.m3u8",
+    "pullUrlFLV": "https://pull.example.com/live/abc123.flv",
+    
+    // Access token for authenticated viewing
+    "accessToken": "jwt_token",
+    "expiresAt": "2025-12-20T21:00:00Z",
+    
+    // Stream info
+    "title": "Flash Sale Live",
+    "status": "LIVE",
+    "startedAt": "2025-12-20T19:00:00Z"
+  }
+}
+```
+
+**If payment required:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PAYMENT_REQUIRED",
+    "message": "This stream requires payment to access",
+    "paymentDetails": {
+      "price": 9.99,
+      "currency": "NGN",
+      "paymentUrl": "/live/uuid/purchase"
+    }
+  }
+}
+```
+
+---
+
+### 6. Get Viewer List Response
+
+**GET /live/{streamId}/viewers → For creator/moderator:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalViewers": 234,
+    "activeViewers": 210,
+    "viewers": [
+      {
+        "userId": "uuid",
+        "username": "johndoe",
+        "displayName": "John Doe",
+        "avatar": "https://...",
+        "joinedAt": "2025-12-20T19:05:00Z",
+        "watchDuration": "15m 30s",
+        "isActive": true,
+        "totalComments": 5,
+        "totalGifts": 3,
+        "totalSpent": 15.00
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 50,
+      "total": 210
+    }
+  }
+}
+```
+
+---
+
+### 7. Payment Transaction Response
+
+**POST /live/{streamId}/purchase → Must return payment result:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentId": "uuid",
+    "transactionId": "TXN123456",
+    "status": "COMPLETED",
+    "amount": 9.99,
+    "currency": "NGN",
+    
+    // Access credentials
+    "accessGranted": true,
+    "accessToken": "jwt_token",
+    "pullUrl": "https://pull.example.com/live/abc123.flv",
+    "expiresAt": "2025-12-20T21:00:00Z",
+    
+    // Receipt
+    "receipt": {
+      "paymentMethod": "card",
+      "last4": "4242",
+      "paidAt": "2025-12-20T19:10:00Z"
+    }
+  }
+}
+```
+
+---
+
+### 8. Live Comments Response (Real-time)
+
+**GET /live/{streamId}/comments?page=1&limit=50:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "comments": [
+      {
+        "commentId": "uuid",
+        "userId": "uuid",
+        "username": "johndoe",
+        "displayName": "John Doe",
+        "avatar": "https://...",
+        "message": "Great stream!",
+        "messageType": "TEXT",
+        "likeCount": 12,
+        "isPinned": false,
+        "createdAt": "2025-12-20T19:15:23Z",
+        
+        // Mentions
+        "mentions": [
+          {"userId": "uuid2", "username": "jane"}
+        ]
+      }
+    ],
+    "pagination": {
+      "total": 289,
+      "page": 1,
+      "limit": 50
+    }
+  }
+}
+```
+
+---
+
+## 🔄 Real-time Updates (WebSocket/SSE)
+
+**Frontend needs real-time updates for:**
+
+### 1. Viewer Count Updates
+```json
+{
+  "type": "VIEWER_COUNT_UPDATE",
+  "streamId": "uuid",
+  "data": {
+    "currentViewers": 245,
+    "change": +5
+  }
+}
+```
+
+### 2. New Comments
+```json
+{
+  "type": "NEW_COMMENT",
+  "streamId": "uuid",
+  "data": {
+    "commentId": "uuid",
+    "userId": "uuid",
+    "username": "johndoe",
+    "message": "Awesome!",
+    "createdAt": "2025-12-20T19:15:23Z"
+  }
+}
+```
+
+### 3. Product Pinned (COMMERCE)
+```json
+{
+  "type": "PRODUCT_PINNED",
+  "streamId": "uuid",
+  "data": {
+    "productId": 456,
+    "name": "Cotton T-Shirt",
+    "price": 29.99,
+    "specialPrice": 23.99,
+    "imageUrl": "https://..."
+  }
+}
+```
+
+### 4. Gift Sent (SOCIAL)
+```json
+{
+  "type": "GIFT_SENT",
+  "streamId": "uuid",
+  "data": {
+    "giftId": "uuid",
+    "senderId": "uuid",
+    "senderName": "johndoe",
+    "giftType": "rose",
+    "quantity": 5,
+    "animation": "rose_shower"
+  }
+}
+```
+
+### 5. Stream Status Change
+```json
+{
+  "type": "STREAM_STATUS_CHANGE",
+  "streamId": "uuid",
+  "data": {
+    "oldStatus": "DRAFT",
+    "newStatus": "LIVE",
+    "startedAt": "2025-12-20T19:00:00Z"
+  }
+}
+```
+
+---
+
+## �👥 Social-Specific Endpoints
+
+**Base:** `/live/social/*` or `/social/live/*`
+
+### Send Virtual Gift
+```
+POST /live/{streamId}/gift
+Authorization: Bearer <viewer_token>
+```
+
+**Request:**
+```json
+{
+  "giftType": "heart" | "star" | "diamond",
+  "quantity": 10
+}
+```
+
+---
+
+### Get Live Comments
+```
+GET /live/{streamId}/comments?page=1&limit=50
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "comments": [
+      {
+        "id": "uuid",
+        "userId": "uuid",
+        "username": "johndoe",
+        "avatar": "https://...",
+        "message": "Great stream!",
+        "timestamp": "2025-12-20T19:15:23Z"
+      }
+    ]
+  }
+}
+```
 
 ### Store Subscription Requirements
 
@@ -155,148 +1204,466 @@ async canCreateLiveStream(storeId: number) {
 
 ---
 
-## 📊 Database Schema Changes
+## 📊 Database Schema - Complete
 
-### New Table: `live_streams`
+> **IMPORTANT:** Database tables are backend storage, NOT API routes!
+> 
+> - **Tables** = Where backend stores data (PostgreSQL/MySQL)
+> - **Routes** = API endpoints frontend calls (`/live/*`, `/live/commerce/*`)
+> 
+> One route can access multiple tables, and one table can serve multiple routes.
 
-```prisma
-model LiveStream {
-  id                    String                @id @default(uuid())
-  store                 Store                 @relation(fields: [storeId], references: [id])
-  storeId               Int                   // Links to existing Store
-  title                 String                @db.VarChar(100)
-  description           String?               @db.VarChar(500)
-  thumbnailUrl          String?
-  
-  // Monetization (uses store commission rate)
-  monetizationType      LiveMonetizationType  @default(LIVE_COMMERCE)
-  price                 Decimal?              @db.Decimal(10, 2)
-  currency              String                @default("NGN")
-  commissionPercentage  Decimal               // Copied from store subscription
-  
-  // BytePlus Integration
-  byteplusStreamKey     String                @unique
-  byteplusPushUrl       String
-  byteplusPullUrl       String
-  byteplusStreamId      String?
-  
-  // Stream State
-  status                LiveStreamStatus      @default(DRAFT)
-  scheduledStartTime    DateTime?
-  actualStartTime       DateTime?
-  actualEndTime         DateTime?
-  
-  // Metrics
-  currentViewers        Int                   @default(0)
-  totalViews            Int                   @default(0)
-  peakViewers           Int                   @default(0)
-  
-  // Settings
-  recordingEnabled      Boolean               @default(false)
-  recordingUrl          String?
-  maxViewers            Int?                  // For MASTERCLASS
-  
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  
-  // Relations
-  pinnedProducts        LiveProduct[]
-  viewers               LiveViewer[]
-  orders                Order[]               // Orders from this stream
-  
-  @@index([storeId, status])
-  @@index([status, actualStartTime])
-}
+---
 
-enum LiveMonetizationType {
-  FREE              // Free to watch
-  LIVE_COMMERCE     // Product sales (main model)
-  LIVE_EVENT        // Paid ticket
-  MASTERCLASS       // Paid class
-  BRAND_SPONSORED   // Sponsored content
-}
+## 🗺️ Route → Table Mapping
 
-enum LiveStreamStatus {
-  DRAFT
-  SCHEDULED
-  LIVE
-  ENDED
-  CANCELLED
-}
+Here's which API routes use which database tables:
+
+### Core Routes (`/live/*`) - Universal endpoints
+
+| API Route | Database Tables Used | Purpose |
+|-----------|---------------------|---------|
+| `POST /live/create` | `live_streams` | Create stream record |
+| `POST /live/{id}/start` | `live_streams` | Update status to LIVE |
+| `POST /live/{id}/end` | `live_streams`, `live_analytics` | End stream, calculate analytics |
+| `GET /live/active` | `live_streams` | Query active streams |
+| `GET /live/{id}` | `live_streams`, `live_viewers`, `live_comments` | Get full stream details |
+| `POST /live/{id}/access` | `live_streams`, `live_viewers`, `live_payments` | Grant/check viewer access |
+| `GET /live/{id}/analytics` | `live_analytics`, `live_streams` | Get aggregated metrics |
+
+### Commerce Routes (`/live/commerce/*`) - Store owner features
+
+| API Route | Database Tables Used | Purpose |
+|-----------|---------------------|---------|
+| `POST /live/{id}/pin-product` | `live_products`, `live_streams` | Pin product during stream |
+| `GET /live/commerce/{id}/analytics` | `live_analytics`, `live_products`, `orders` | Commerce-specific metrics |
+| `GET /live/commerce/{id}/sales` | `orders`, `live_products` | Real-time sales tracking |
+
+### Social Routes (`/live/social/*`) - User engagement features
+
+| API Route | Database Tables Used | Purpose |
+|-----------|---------------------|---------|
+| `POST /live/{id}/gift` | `live_gifts`, `live_payments`, `live_streams` | Send virtual gift |
+| `POST /live/{id}/comment` | `live_comments`, `live_streams` | Post comment |
+| `GET /live/{id}/comments` | `live_comments` | Get chat history |
+| `GET /live/social/{id}/gifts` | `live_gifts` | Get gift leaderboard |
+
+### All Stream Types Use These Tables:
+
+- **`live_streams`** - Core metadata (title, status, creator) - ALL streams
+- **`live_viewers`** - Who's watching - ALL streams  
+- **`live_analytics`** - Metrics - ALL streams
+- **`live_comments`** - Chat messages - ALL streams (if enabled)
+- **`live_payments`** - Transactions - ALL paid features
+
+### Type-Specific Tables:
+
+- **`live_products`** - ONLY used by COMMERCE streams
+- **`live_gifts`** - ONLY used by SOCIAL streams
+
+---
+
+### 1. Core Table: `live_streams`
+
+**Stores all stream metadata and state:**
+
+```sql
+CREATE TABLE live_streams (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_type VARCHAR(20) NOT NULL CHECK (stream_type IN ('COMMERCE', 'SOCIAL', 'PODCAST')),
+  
+  -- Creator (flexible - user OR store)
+  creator_user_id UUID,                    -- For SOCIAL/PODCAST streams
+  creator_store_id INT,                    -- For COMMERCE streams
+  
+  -- Metadata
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  thumbnail_url VARCHAR(500),
+  category_id INT REFERENCES categories(id),
+  tags TEXT[],                             -- Array of tags
+  language VARCHAR(10) DEFAULT 'en',       -- Stream language
+  
+  -- BytePlus Integration (secure credentials)
+  byteplus_stream_id VARCHAR(255) UNIQUE NOT NULL,
+  byteplus_stream_key VARCHAR(255) NOT NULL,  -- ENCRYPTED
+  byteplus_push_url VARCHAR(500) NOT NULL,
+  byteplus_pull_url VARCHAR(500) NOT NULL,
+  
+  -- Stream Status & Timing
+  status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SCHEDULED', 'LIVE', 'ENDED', 'CANCELLED')),
+  scheduled_start_time TIMESTAMP,
+  actual_start_time TIMESTAMP,
+  actual_end_time TIMESTAMP,
+  stream_duration_seconds INT,             -- Calculated on end
+  
+  -- Monetization
+  monetization_type VARCHAR(50) NOT NULL,
+  price DECIMAL(10, 2),
+  currency VARCHAR(3) DEFAULT 'NGN',
+  commission_percentage DECIMAL(5, 2),     -- Store's rate
+  total_revenue DECIMAL(10, 2) DEFAULT 0,  -- Running total
+  
+  -- Analytics Counters
+  current_viewers INT DEFAULT 0,
+  total_views INT DEFAULT 0,
+  peak_viewers INT DEFAULT 0,
+  unique_viewers INT DEFAULT 0,
+  total_watch_time_seconds BIGINT DEFAULT 0,
+  average_watch_time_seconds INT DEFAULT 0,
+  
+  -- Engagement Metrics
+  total_likes INT DEFAULT 0,
+  total_comments INT DEFAULT 0,
+  total_shares INT DEFAULT 0,
+  total_gifts_received INT DEFAULT 0,      -- For social streams
+  
+  -- Commerce Metrics (COMMERCE type only)
+  total_orders INT DEFAULT 0,
+  total_products_sold INT DEFAULT 0,
+  conversion_rate DECIMAL(5, 2),           -- (orders / views) * 100
+  
+  -- Recording
+  recording_enabled BOOLEAN DEFAULT false,
+  recording_status VARCHAR(20),            -- 'PROCESSING', 'READY', 'FAILED'
+  recording_url VARCHAR(500),
+  recording_duration_seconds INT,
+  
+  -- Settings
+  max_viewers INT,                         -- For MASTERCLASS
+  is_public BOOLEAN DEFAULT true,
+  allow_comments BOOLEAN DEFAULT true,
+  allow_gifts BOOLEAN DEFAULT true,
+  moderation_mode VARCHAR(20) DEFAULT 'AUTO',
+  
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP,                    -- Soft delete
+  
+  -- Constraints
+  CONSTRAINT check_creator CHECK (
+    (creator_user_id IS NOT NULL AND creator_store_id IS NULL AND stream_type IN ('SOCIAL', 'PODCAST'))
+    OR
+    (creator_store_id IS NOT NULL AND creator_user_id IS NULL AND stream_type = 'COMMERCE')
+  )
+);
+
+-- Indexes for performance
+CREATE INDEX idx_live_streams_status ON live_streams(status, actual_start_time DESC);
+CREATE INDEX idx_live_streams_creator_user ON live_streams(creator_user_id, status);
+CREATE INDEX idx_live_streams_creator_store ON live_streams(creator_store_id, status);
+CREATE INDEX idx_live_streams_type ON live_streams(stream_type, status);
+CREATE INDEX idx_live_streams_scheduled ON live_streams(scheduled_start_time) WHERE status = 'SCHEDULED';
 ```
 
-### New Table: `live_products`
+---
 
-```prisma
-model LiveProduct {
-  id            String      @id @default(uuid())
-  liveStream    LiveStream  @relation(fields: [streamId], references: [id])
-  streamId      String
-  product       Product     @relation(fields: [productId], references: [id])
-  productId     Int         // Links to existing Product
+### 2. Viewer Access & Session Tracking: `live_viewers`
+
+**Tracks who watched, for how long, and payment status:**
+
+```sql
+CREATE TABLE live_viewers (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID NOT NULL REFERENCES live_streams(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   
-  pinnedAt      DateTime    @default(now())
-  unpinnedAt    DateTime?
-  position      Int         @default(0)
+  -- Session Tracking
+  joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  left_at TIMESTAMP,
+  watch_duration_seconds INT,              -- Calculated on leave
+  is_active BOOLEAN DEFAULT true,
   
-  // Stream-specific pricing
-  specialPrice  Decimal?    @db.Decimal(10, 2)
-  soldCount     Int         @default(0)
+  -- Access Control
+  access_granted BOOLEAN DEFAULT false,
+  access_type VARCHAR(20),                 -- 'FREE', 'PAID', 'GIFT', 'VIP'
+  payment_id UUID,                         -- Link to live_payments if paid
   
-  isActive      Boolean     @default(true)
+  -- Engagement
+  total_comments INT DEFAULT 0,
+  total_gifts_sent INT DEFAULT 0,
+  total_likes INT DEFAULT 0,
   
-  @@index([streamId, isActive])
-  @@index([productId])
-}
+  -- Device & Location
+  device_type VARCHAR(20),                 -- 'mobile', 'desktop', 'tablet'
+  ip_address VARCHAR(45),
+  country_code VARCHAR(3),
+  city VARCHAR(100),
+  
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  
+  CONSTRAINT unique_viewer_session UNIQUE(stream_id, user_id, joined_at)
+);
+
+-- Indexes
+CREATE INDEX idx_live_viewers_stream ON live_viewers(stream_id, is_active);
+CREATE INDEX idx_live_viewers_user ON live_viewers(user_id, joined_at DESC);
+CREATE INDEX idx_live_viewers_active ON live_viewers(stream_id, is_active) WHERE is_active = true;
 ```
 
-### New Table: `live_viewers`
+---
 
-```prisma
-model LiveViewer {
-  id         String      @id @default(uuid())
-  liveStream LiveStream  @relation(fields: [streamId], references: [id])
-  streamId   String
-  user       User        @relation(fields: [userId], references: [id])
-  userId     Int
+### 3. Payment Transactions: `live_payments`
+
+**Tracks all monetary transactions (event tickets, gifts, donations):**
+
+```sql
+CREATE TABLE live_payments (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID NOT NULL REFERENCES live_streams(id),
+  user_id UUID NOT NULL,                   -- Payer
   
-  joinedAt   DateTime    @default(now())
-  leftAt     DateTime?
-  duration   Int?        // Seconds watched
+  -- Payment Details
+  payment_type VARCHAR(20) NOT NULL,       -- 'EVENT_TICKET', 'VIRTUAL_GIFT', 'DONATION', 'TIP'
+  amount DECIMAL(10, 2) NOT NULL,
+  currency VARCHAR(3) DEFAULT 'NGN',
   
-  // For paid streams
-  hasPaid    Boolean     @default(false)
-  paymentId  String?
+  -- Commission Split
+  platform_fee DECIMAL(10, 2) NOT NULL,
+  creator_earning DECIMAL(10, 2) NOT NULL,
+  commission_percentage DECIMAL(5, 2),
   
-  @@unique([streamId, userId])
-  @@index([streamId, joinedAt])
-}
+  -- Payment Gateway
+  payment_method VARCHAR(50),              -- 'card', 'bank_transfer', 'mobile_money'
+  payment_gateway VARCHAR(50),             -- 'paystack', 'flutterwave'
+  gateway_transaction_id VARCHAR(255),
+  gateway_reference VARCHAR(255) UNIQUE,
+  
+  -- Status
+  status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED')),
+  
+  -- Gift-Specific (if payment_type = VIRTUAL_GIFT)
+  gift_type VARCHAR(50),                   -- 'heart', 'star', 'diamond', 'rose'
+  gift_quantity INT DEFAULT 1,
+  
+  -- Refund
+  refunded_at TIMESTAMP,
+  refund_reason TEXT,
+  refund_amount DECIMAL(10, 2),
+  
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP,
+  
+  CONSTRAINT positive_amount CHECK (amount > 0)
+);
+
+-- Indexes
+CREATE INDEX idx_live_payments_stream ON live_payments(stream_id, status);
+CREATE INDEX idx_live_payments_user ON live_payments(user_id, created_at DESC);
+CREATE INDEX idx_live_payments_gateway_ref ON live_payments(gateway_reference);
+CREATE INDEX idx_live_payments_status ON live_payments(status, created_at DESC);
 ```
 
-### Update Existing `Order` Model
+---
 
-```prisma
-model Order {
-  // ... existing fields ...
+### 4. Product Pinning (Commerce): `live_products`
+
+**Tracks products showcased during commerce streams:**
+
+```sql
+CREATE TABLE live_products (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID NOT NULL REFERENCES live_streams(id) ON DELETE CASCADE,
+  product_id INT NOT NULL,                 -- References ecommerce.products
   
-  // NEW: Track live stream sales
-  orderSource   String?     // "LIVE_STREAM" or "REGULAR"
-  liveStream    LiveStream? @relation(fields: [streamId], references: [id])
-  streamId      String?
+  -- Pinning Timeline
+  pinned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  unpinned_at TIMESTAMP,
+  pin_duration_seconds INT,                -- How long it was pinned
+  is_currently_pinned BOOLEAN DEFAULT true,
+  pin_position INT DEFAULT 0,              -- For multiple pins
   
-  @@index([orderSource, createdAt])
-}
+  -- Product Snapshot (cache at pin time)
+  product_name VARCHAR(255),
+  product_price DECIMAL(10, 2),
+  product_image_url VARCHAR(500),
+  
+  -- Stream-Specific Pricing
+  special_price DECIMAL(10, 2),            -- Optional stream discount
+  discount_percentage DECIMAL(5, 2),
+  
+  -- Performance Metrics
+  view_count INT DEFAULT 0,                -- How many viewers saw it
+  click_count INT DEFAULT 0,               -- How many clicked
+  add_to_cart_count INT DEFAULT 0,
+  purchase_count INT DEFAULT 0,
+  revenue_generated DECIMAL(10, 2) DEFAULT 0,
+  
+  CONSTRAINT unique_stream_product UNIQUE(stream_id, product_id, pinned_at)
+);
+
+-- Indexes
+CREATE INDEX idx_live_products_stream ON live_products(stream_id, pinned_at DESC);
+CREATE INDEX idx_live_products_product ON live_products(product_id);
+CREATE INDEX idx_live_products_active ON live_products(stream_id, is_currently_pinned) WHERE is_currently_pinned = true;
 ```
 
-### Update Existing `Store` Model
+---
 
-```prisma
-model Store {
-  // ... existing fields ...
+### 5. Stream Analytics (Aggregated): `live_analytics`
+
+**Daily/hourly aggregated metrics for reporting:**
+
+```sql
+CREATE TABLE live_analytics (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID NOT NULL REFERENCES live_streams(id),
   
-  // NEW: Live streaming relation
-  liveStreams   LiveStream[]
-}
+  -- Time Window
+  date DATE NOT NULL,
+  hour INT,                                -- 0-23, NULL for daily aggregates
+  
+  -- Viewer Metrics
+  total_viewers INT DEFAULT 0,
+  unique_viewers INT DEFAULT 0,
+  peak_concurrent_viewers INT DEFAULT 0,
+  average_watch_time_seconds INT DEFAULT 0,
+  total_watch_time_seconds BIGINT DEFAULT 0,
+  
+  -- Engagement Metrics
+  total_comments INT DEFAULT 0,
+  total_likes INT DEFAULT 0,
+  total_shares INT DEFAULT 0,
+  total_gifts INT DEFAULT 0,
+  
+  -- Revenue Metrics (COMMERCE type)
+  total_orders INT DEFAULT 0,
+  total_revenue DECIMAL(10, 2) DEFAULT 0,
+  average_order_value DECIMAL(10, 2),
+  conversion_rate DECIMAL(5, 2),
+  
+  -- Geographic Distribution
+  top_countries JSONB,                     -- {"NG": 120, "GH": 45, ...}
+  top_cities JSONB,
+  
+  -- Device Distribution
+  mobile_percentage DECIMAL(5, 2),
+  desktop_percentage DECIMAL(5, 2),
+  tablet_percentage DECIMAL(5, 2),
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  
+  CONSTRAINT unique_stream_period UNIQUE(stream_id, date, hour)
+);
+
+-- Indexes
+CREATE INDEX idx_live_analytics_stream_date ON live_analytics(stream_id, date DESC);
+CREATE INDEX idx_live_analytics_date ON live_analytics(date DESC);
+```
+
+---
+
+### 6. Live Comments (Real-time): `live_comments`
+
+**Stores chat messages during streams:**
+
+```sql
+CREATE TABLE live_comments (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID NOT NULL REFERENCES live_streams(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  
+  -- Content
+  message TEXT NOT NULL,
+  message_type VARCHAR(20) DEFAULT 'TEXT', -- 'TEXT', 'EMOJI', 'STICKER', 'SYSTEM'
+  
+  -- Moderation
+  is_visible BOOLEAN DEFAULT true,
+  is_pinned BOOLEAN DEFAULT false,
+  is_flagged BOOLEAN DEFAULT false,
+  moderation_status VARCHAR(20) DEFAULT 'APPROVED',
+  
+  -- Reactions
+  like_count INT DEFAULT 0,
+  
+  -- Metadata
+  mentioned_user_ids UUID[],               -- @mentions
+  
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP,                    -- Soft delete
+  
+  CONSTRAINT message_length CHECK (LENGTH(message) <= 500)
+);
+
+-- Indexes
+CREATE INDEX idx_live_comments_stream ON live_comments(stream_id, created_at DESC);
+CREATE INDEX idx_live_comments_user ON live_comments(user_id, created_at DESC);
+CREATE INDEX idx_live_comments_visible ON live_comments(stream_id, is_visible, created_at DESC) WHERE is_visible = true;
+```
+
+---
+
+### 7. Virtual Gifts (Social): `live_gifts`
+
+**Tracks gifts sent during social streams:**
+
+```sql
+CREATE TABLE live_gifts (
+  -- Identity
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID NOT NULL REFERENCES live_streams(id),
+  sender_user_id UUID NOT NULL,
+  receiver_user_id UUID NOT NULL,          -- Stream creator
+  
+  -- Gift Details
+  gift_type VARCHAR(50) NOT NULL,          -- 'heart', 'star', 'rose', 'diamond'
+  gift_quantity INT NOT NULL DEFAULT 1,
+  gift_value DECIMAL(10, 2) NOT NULL,      -- Total value
+  unit_price DECIMAL(10, 2) NOT NULL,      -- Price per gift
+  
+  -- Payment
+  payment_id UUID REFERENCES live_payments(id),
+  
+  -- Display
+  display_animation VARCHAR(50),           -- Animation type for UI
+  is_combo BOOLEAN DEFAULT false,          -- Combo gift (multiple at once)
+  combo_count INT DEFAULT 1,
+  
+  -- Timestamps
+  sent_at TIMESTAMP DEFAULT NOW(),
+  
+  CONSTRAINT positive_quantity CHECK (gift_quantity > 0)
+);
+
+-- Indexes
+CREATE INDEX idx_live_gifts_stream ON live_gifts(stream_id, sent_at DESC);
+CREATE INDEX idx_live_gifts_sender ON live_gifts(sender_user_id, sent_at DESC);
+CREATE INDEX idx_live_gifts_receiver ON live_gifts(receiver_user_id, sent_at DESC);
+```
+
+---
+
+### 8. Update Existing Tables
+
+**Add livestream tracking to orders:**
+
+```sql
+-- Add columns to existing orders table
+ALTER TABLE orders ADD COLUMN order_source VARCHAR(20) DEFAULT 'REGULAR';
+ALTER TABLE orders ADD COLUMN source_stream_id UUID REFERENCES live_streams(id);
+ALTER TABLE orders ADD COLUMN viewer_session_id UUID REFERENCES live_viewers(id);
+
+CREATE INDEX idx_orders_source ON orders(order_source, created_at DESC);
+CREATE INDEX idx_orders_stream ON orders(source_stream_id) WHERE source_stream_id IS NOT NULL;
+```
+
+**Add livestream relation to stores:**
+
+```sql
+-- No structural change needed - live_streams already references stores
+-- Just add an index for performance
+CREATE INDEX idx_stores_live_enabled ON stores(id) WHERE subscription_plan != 'FREE';
 ```
 
 ---
@@ -1362,15 +2729,15 @@ SecretAccessKey: your_secret_key
 
 ---
 
-## 🛒 MISSING E-COMMERCE ENDPOINTS (NOT YET IMPLEMENTED)
+## � ADDITIONAL REQUIREMENTS
 
-**Status:** These 14 endpoints return **404 Not Found** and need to be implemented.
+**Note:** MediaLive depends on existing e-commerce infrastructure (stores, products, subscriptions). Those core endpoints are documented separately.
 
 ### Base URL: `https://api.lykluk.com`
 
 ---
 
-### 📂 CATEGORIES (3 endpoints) - NOT IMPLEMENTED
+### 📂 CATEGORIES (3 endpoints) - Needed for Content Organization
 
 #### 1. Get All Categories
 ```
@@ -1434,201 +2801,7 @@ GET /categories/{id}
 
 ---
 
-### 🚚 LOGISTICS & CARRIERS (11 endpoints) - NOT IMPLEMENTED
-
-#### 1. Get Available Carriers
-```
-GET /logistics/carriers
-```
-**Description:** Get all available shipping carriers
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "fedex",
-      "name": "FedEx",
-      "description": "Fast and reliable worldwide shipping",
-      "logo": "https://...",
-      "deliveryTime": "2-3 days",
-      "baseRate": 9.99,
-      "supported": true
-    }
-  ]
-}
-```
-
-#### 2. Get Carrier Details
-```
-GET /logistics/carriers/{id}
-```
-**Description:** Get detailed information about a specific carrier
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "fedex",
-    "name": "FedEx",
-    "description": "Fast and reliable worldwide shipping",
-    "logo": "https://...",
-    "features": ["tracking", "insurance", "signature"],
-    "deliveryTimes": {
-      "domestic": "2-3 days",
-      "international": "5-7 days"
-    },
-    "rates": {
-      "base": 9.99,
-      "perKg": 2.50
-    }
-  }
-}
-```
-
-#### 3. Get Recommended Carriers
-```
-GET /logistics/carriers/recommend
-Query Params: ?weight=5&destination=US&origin=NG
-```
-**Description:** Get recommended carriers based on order parameters
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "recommended": [
-      {
-        "carrierId": "fedex",
-        "estimatedCost": 25.99,
-        "estimatedDays": 3,
-        "confidence": 0.95
-      }
-    ]
-  }
-}
-```
-
-#### 4. Get Store Configured Carriers
-```
-GET /logistics/stores/{storeId}/carriers
-```
-**Description:** Get carriers configured for a specific store
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "storeId": 42,
-    "carriers": ["fedex", "ups", "dhl"],
-    "defaultCarrier": "fedex",
-    "preferences": {...}
-  }
-}
-```
-
-#### 5. Add Logistics Preference
-```
-POST /store/logistics/preferences
-Authorization: Bearer <token>
-```
-**Request Body:**
-```json
-{
-  "name": "Domestic Standard",
-  "description": "Standard shipping for domestic orders",
-  "carrierId": "fedex",
-  "zone": "US",
-  "weightLimit": 50,
-  "isActive": true
-}
-```
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "storeId": 42,
-    "name": "Domestic Standard",
-    "createdAt": "2025-12-19T10:00:00Z"
-  }
-}
-```
-
-#### 6. Get Store Logistics Preferences
-```
-GET /store/logistics/preferences
-Authorization: Bearer <token>
-```
-**Description:** Get all logistics preferences for authenticated store
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "storeId": 42,
-      "name": "Domestic Standard",
-      "description": "Standard shipping for domestic orders",
-      "carrierId": "fedex",
-      "zone": "US",
-      "weightLimit": 50,
-      "isActive": true
-    }
-  ]
-}
-```
-
-#### 7. Update Logistics Preference
-```
-PUT /store/logistics/preferences/{id}
-Authorization: Bearer <token>
-```
-**Request Body:** Same as Add (partial update supported)
-**Response:** Updated preference object
-
-#### 8. Delete Logistics Preference
-```
-DELETE /store/logistics/preferences/{id}
-Authorization: Bearer <token>
-```
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Preference deleted successfully"
-}
-```
-
-#### 9. Set Preferred Carriers
-```
-PUT /store/logistics/preferred
-Authorization: Bearer <token>
-```
-**Request Body:**
-```json
-{
-  "carrierIds": ["fedex", "ups", "dhl"]
-}
-```
-**Description:** Set the store's preferred carriers in priority order
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "storeId": 42,
-    "preferredCarriers": ["fedex", "ups", "dhl"],
-    "updatedAt": "2025-12-19T10:00:00Z"
-  }
-}
-```
-
----
-
-### ⚕️ HEALTH CHECK (1 endpoint) - NOT IMPLEMENTED
+### ⚕️ HEALTH CHECK (1 endpoint) - For Monitoring
 
 #### Health Check
 ```
@@ -1653,58 +2826,191 @@ GET /health
 
 ## 📊 Implementation Priority
 
-### HIGH PRIORITY (Needed for MVP):
-1. ✅ **Categories** - Required for product browsing/filtering
-2. ✅ **Health Check** - Required for monitoring
+### Phase 1 - Core Live Infrastructure (Week 1-2)
+**Goal:** Basic livestreaming works for ANY type
 
-### MEDIUM PRIORITY (Enhance UX):
-3. ✅ **Basic Logistics** - Get carriers, store carriers
-4. ⚠️ **Carrier Recommendations** - Nice to have (can use basic selection first)
+1. **Database Setup**
+   - Create `live_streams` table (with `stream_type` field)
+   - Create `live_viewers` table
+   - Create `live_analytics` table
 
-### LOW PRIORITY (Advanced Features):
-5. ⚠️ **Logistics Preferences** - Can be added after MVP
-6. ⚠️ **Preferred Carriers** - Store configuration feature
+2. **BytePlus Integration**
+   - Set up BytePlus account
+   - Implement BytePlus OpenAPI SDK
+   - Test stream creation/termination
+
+3. **Core API Endpoints**
+   - `POST /live/create` (type-agnostic)
+   - `POST /live/{id}/start`
+   - `POST /live/{id}/end`
+   - `GET /live/active?type=COMMERCE|SOCIAL`
+   - `GET /live/{id}`
+
+4. **Testing**
+   - Create COMMERCE stream (requires store)
+   - Create SOCIAL stream (requires user)
+   - Verify BytePlus credentials work
+
+---
+
+### Phase 2 - Commerce Integration (Week 3)
+**Goal:** Store owners can sell products live
+
+1. **Commerce Validation**
+   - Check store ownership
+   - Check store verification status
+   - Validate subscription tier (at `/ecommerce/subscription/*`)
+   - Enforce tier limits (streams/month, duration)
+
+2. **Commerce Features**
+   - `POST /live/{id}/pin-product`
+   - Track product views during stream
+   - Link orders to livestream source
+   - Commerce analytics dashboard
+
+3. **UI Integration**
+   - Update Flutter `live_stream` module
+   - Add `streamType` to models
+   - Show different UI for COMMERCE vs SOCIAL
+
+---
+
+### Phase 3 - Social Integration (Week 4)
+**Goal:** Regular users can go live
+
+1. **Social Validation**
+   - Check user verification status
+   - Optional: Check user reputation score
+   - Set stream limits for new users
+
+2. **Social Features**
+   - `POST /live/{id}/gift` (virtual gifts)
+   - WebSocket for live comments
+   - Follower notifications
+   - Social analytics
+
+3. **UI Updates**
+   - Add "Go Live" button to social profile
+   - Live comment overlay
+   - Virtual gift animations
+
+---
+
+### Phase 4 - Monetization & Polish (Week 5-6)
+
+1. **Payment Integration**
+   - Paid events (`LIVE_EVENT`, `MASTERCLASS`)
+   - Virtual gift purchases
+   - Commission tracking
+   - Payouts to creators
+
+2. **Advanced Features**
+   - Replays & VOD
+   - Scheduled streams
+   - Co-hosting
+   - Stream moderation tools
+
+---
+
+### Phase 5 - Podcast (Future)
+
+1. **Audio-Only Mode**
+   - Disable video track
+   - Lower bandwidth requirements
+   - Background playback support
+
+2. **Podcast Features**
+   - RSS feed generation
+   - Episode management
+   - Podcast discovery
+   - Audio-only player
 
 ---
 
 ## 🧪 Testing Status
 
-| Endpoint Group | Status | Test Date | Result |
-|----------------|--------|-----------|--------|
-| Store Management | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Product Management | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Cart | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Orders | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Subscriptions | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Social | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Recommendations | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Analytics | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| Addresses | ✅ Working | 2025-12-19 | 401 (Authenticated) |
-| **Categories** | ❌ Not Implemented | 2025-12-19 | **404** |
-| **Logistics** | ❌ Not Implemented | 2025-12-19 | **404** |
-| **Health Check** | ❌ Not Implemented | 2025-12-19 | **404** |
+**Last tested:** December 20, 2025
 
-**Note:** 401 responses mean endpoints exist and require authentication (working correctly). 404 means endpoints don't exist yet.
+### E-Commerce Endpoints (Verified Working)
+| Endpoint | Status | Result |
+|----------|--------|--------|
+| GET /ecommerce/store/my-store | ✅ Exists | 401 (needs auth) |
+| GET /ecommerce/products | ✅ Working | 200 (returns data) |
+| GET /ecommerce/categories | ✅ Working | 200 (8 categories) |
+| GET /ecommerce/cart | ✅ Exists | 401 (needs auth) |
+| GET /ecommerce/orders | ✅ Exists | 401 (needs auth) |
+
+### MediaLive Endpoints (Not Implemented)
+| Endpoint | Status | Result |
+|----------|--------|--------|
+| POST /live/create | ❌ Not Implemented | 404 |
+| POST /live/{id}/start | ❌ Not Implemented | 404 |
+| POST /live/{id}/end | ❌ Not Implemented | 404 |
+| GET /live/active | ❌ Not Implemented | 404 |
+| GET /live/{id} | ❌ Not Implemented | 404 |
+| POST /live/{id}/pin-product | ❌ Not Implemented | 404 |
+| POST /live/{id}/access | ❌ Not Implemented | 404 |
+| GET /live/replays | ❌ Not Implemented | 404 |
 
 ---
 
 ## 📋 Backend Team Action Items
 
-### Immediate (This Week):
-- [ ] Implement `/categories` endpoints (3 endpoints)
-- [ ] Implement `/health` endpoint (1 endpoint)
-- [ ] Add category seeding/migration with basic categories
+### IMMEDIATE (Phase 1 - Core Setup):
+- [ ] Create `live_streams` table with `stream_type` enum
+- [ ] Set up BytePlus MediaLive account
+- [ ] Integrate BytePlus OpenAPI SDK (Node.js/Python/Go)
+- [ ] Implement stream key encryption
+- [ ] Create `/live/create` endpoint (type-agnostic)
+- [ ] Create `/live/{id}/start` endpoint
+- [ ] Create `/live/{id}/end` endpoint
+- [ ] Create `/live/active` endpoint
+- [ ] Test with both COMMERCE and SOCIAL stream types
 
-### Next Sprint:
-- [ ] Implement basic `/logistics/carriers` endpoints (2 endpoints)
-- [ ] Implement `/logistics/stores/{id}/carriers` endpoint
-- [ ] Add carrier configuration to store settings
+### SHORT-TERM (Phase 2 - Commerce):
+- [ ] Add store validation to COMMERCE streams
+- [ ] Add subscription validation (check `/ecommerce/subscription/*`)
+- [ ] Implement `/live/{id}/pin-product`
+- [ ] Track sales from livestreams
+- [ ] Add commerce analytics
 
-### Future (Post-MVP):
-- [ ] Implement logistics preferences endpoints (5 endpoints)
-- [ ] Implement carrier recommendation algorithm
-- [ ] Add rate calculation API
+### MEDIUM-TERM (Phase 3 - Social):
+- [ ] Add user verification checks
+- [ ] Implement `/live/{id}/gift` endpoint
+- [ ] Add WebSocket for live comments
+- [ ] Implement follower notifications
+- [ ] Add social analytics
+
+### LONG-TERM (Phase 4 - Monetization):
+- [ ] Implement paid event access
+- [ ] Process virtual gift payments
+- [ ] Calculate and track commissions
+- [ ] Implement creator payouts
+- [ ] Add replay/VOD system
 
 ---
 
-**Contact Frontend Team if you need clarification on any requirements.**
+## 🎯 Success Criteria
+
+**Phase 1 Complete When:**
+- ✅ Can create COMMERCE stream (requires storeId)
+- ✅ Can create SOCIAL stream (just userId)
+- ✅ BytePlus returns valid push URL/stream key
+- ✅ Can start/end streams successfully
+- ✅ Active streams list shows both types
+
+**Phase 2 Complete When:**
+- ✅ COMMERCE streams validate store ownership
+- ✅ COMMERCE streams check subscription tier
+- ✅ Can pin products during commerce stream
+- ✅ Sales tracked back to livestream source
+
+**Phase 3 Complete When:**
+- ✅ SOCIAL streams validate user verification
+- ✅ Virtual gifts can be sent and tracked
+- ✅ Live comments work via WebSocket
+- ✅ Followers get notified when creator goes live
+
+---
+
+**Note:** The core `/live/*` infrastructure serves ALL stream types. Type-specific logic (store validation, subscription checks, product pinning) happens in middleware/validation layers, not in core stream management.
