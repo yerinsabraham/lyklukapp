@@ -851,6 +851,18 @@ Authorization: Bearer <store_owner_token>
       ]
     },
     
+    // Milestones Achieved
+    "milestones": {
+      "achieved": [10, 50, 100, 500],  // Milestones reached during stream
+      "highestMilestone": 500,
+      "milestoneTimestamps": [
+        {"viewers": 10, "reachedAt": "2025-12-20T19:05:00Z"},
+        {"viewers": 50, "reachedAt": "2025-12-20T19:15:00Z"},
+        {"viewers": 100, "reachedAt": "2025-12-20T19:30:00Z"},
+        {"viewers": 500, "reachedAt": "2025-12-20T20:15:00Z"}
+      ]
+    },
+    
     // Timeline (hourly breakdown)
     "timeline": [
       {
@@ -1003,6 +1015,7 @@ Authorization: Bearer <store_owner_token>
         "avatar": "https://...",
         "message": "Great stream!",
         "messageType": "TEXT",
+        "userType": "NORMAL",  // 'NORMAL' | 'VIP' | 'MODERATOR' | 'VERIFIED'
         "likeCount": 12,
         "isPinned": false,
         "createdAt": "2025-12-20T19:15:23Z",
@@ -1050,6 +1063,7 @@ Authorization: Bearer <store_owner_token>
     "userId": "uuid",
     "username": "johndoe",
     "message": "Awesome!",
+    "userType": "VIP",  // 'NORMAL' | 'VIP' | 'MODERATOR' | 'VERIFIED'
     "createdAt": "2025-12-20T19:15:23Z"
   }
 }
@@ -1096,6 +1110,44 @@ Authorization: Bearer <store_owner_token>
     "newStatus": "LIVE",
     "startedAt": "2025-12-20T19:00:00Z"
   }
+}
+```
+
+### 6. Viewer Milestone Reached
+```json
+{
+  "type": "VIEWER_MILESTONE",
+  "streamId": "uuid",
+  "data": {
+    "milestone": 100,
+    "currentViewers": 100,
+    "message": "🎉 100 viewers milestone!",
+    "celebrationType": "confetti"  // Frontend triggers confetti animation
+  }
+}
+```
+
+**Milestone Thresholds:** 10, 50, 100, 500, 1000 viewers
+
+**Backend Logic:**
+```typescript
+// When viewer count changes, check milestones
+const MILESTONES = [10, 50, 100, 500, 1000];
+
+if (MILESTONES.includes(newViewerCount) && newViewerCount > lastMilestone) {
+  // Broadcast milestone event to all viewers
+  websocket.broadcast(streamId, {
+    type: 'VIEWER_MILESTONE',
+    data: {
+      milestone: newViewerCount,
+      currentViewers: newViewerCount,
+      message: `🎉 ${newViewerCount} viewers milestone!`,
+      celebrationType: 'confetti'
+    }
+  });
+  
+  // Update analytics
+  await analytics.recordMilestone(streamId, newViewerCount);
 }
 ```
 
