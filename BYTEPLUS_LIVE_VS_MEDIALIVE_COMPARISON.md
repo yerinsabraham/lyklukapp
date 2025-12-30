@@ -25,33 +25,7 @@
 
 ## What You Currently Have (BytePlus MediaLive + EffectOne SDK)
 
-### **Architecture:**
-```
-Your Custom Flutter App
-├── BytePlus MediaLive (Video Infrastructure)
-│   ├── RTMP Push/Pull URLs
-│   ├── HLS/FLV/WebRTC playback
-│   ├── 4K streaming support
-│   └── Global CDN distribution
-│
-├── BytePlus EffectOne SDK (Creative Tools)
-│   ├── Camera with filters & effects
-│   ├── Beauty AR (face beautification)
-│   ├── Stickers & animations
-│   ├── Video editor (trim, music, transitions)
-│   ├── Draft box functionality
-│   └── GCS resource loading (on-demand effects)
-│
-└── Your Custom Implementation
-    ├── Full e-commerce backend integration
-    ├── Custom UI/UX (professional, branded)
-    ├── Store management
-    ├── Product cards (custom design)
-    ├── Order processing
-    ├── Payment integration (ready for Stripe/Paystack)
-    ├── Custom analytics
-    └── Full control over features
-```
+
 
 ### **What You Can Do Now:**
 ✅ **Full Creative Freedom:**
@@ -85,31 +59,6 @@ Your Custom Flutter App
 
 ## What BytePlus Live Offers (New SDK)
 
-### **Architecture:**
-```
-BytePlus Live Platform
-├── SaaS Solution (Web Console)
-│   ├── Pre-built live rooms
-│   ├── BytePlus-hosted web UI
-│   ├── Limited customization
-│   └── Browser-based management
-│
-├── aPaaS Solution (Mobile SDKs)
-│   ├── Viewer SDK (iOS/Android/Flutter)
-│   ├── Pre-built UI components
-│   ├── Some customization allowed
-│   └── BytePlus-controlled templates
-│
-└── Built-in Features
-    ├── Product cards (BytePlus design)
-    ├── Lucky draws
-    ├── Voting/polls
-    ├── Q&A system
-    ├── Gift rewards system
-    ├── Chat moderation
-    ├── Analytics dashboard
-    └── Multi-language support
-```
 
 ### **What They Provide:**
 
@@ -626,3 +575,4 @@ You have:
 **Prepared by:** GitHub Copilot (AI Assistant)  
 **Date:** December 30, 2025  
 **For:** LykLuk CEO Strategic Decision
+
