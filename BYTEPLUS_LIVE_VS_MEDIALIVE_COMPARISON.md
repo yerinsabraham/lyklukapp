@@ -572,8 +572,9 @@ You have:
 
 ---
 
-**Prepared by:** GitHub Copilot (AI Assistant)  
+**Prepared by:** Yerins Abraham
 **Date:** December 30, 2025  
 **For:** LykLuk CEO Strategic Decision
+
 
 
