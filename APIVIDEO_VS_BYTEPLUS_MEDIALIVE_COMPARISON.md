@@ -108,21 +108,7 @@ api.video Platform (Streaming Infrastructure)
 
 **Verdict:** Roughly equivalent for basic streaming. api.video has SRT and native Flutter SDK. BytePlus has more playback protocols.
 
-### **2. Creative Tools (NOT PART OF COMPARISON)**
-
-**⚠️ CLARIFICATION: BytePlus EffectOne SDK is SEPARATE from streaming infrastructure**
-
-| Feature | With BytePlus MediaLive | With api.video | Impact |
-|---------|------------------------|----------------|--------|
-| Filters & Effects | ✅ EffectOne SDK | ✅ EffectOne SDK | **NO CHANGE** ✅ |
-| Beauty AR | ✅ EffectOne SDK | ✅ EffectOne SDK | **NO CHANGE** ✅ |
-| Stickers | ✅ EffectOne SDK | ✅ EffectOne SDK | **NO CHANGE** ✅ |
-| Video Editor | ✅ EffectOne SDK | ✅ EffectOne SDK | **NO CHANGE** ✅ |
-| Draft System | ✅ EffectOne SDK | ✅ EffectOne SDK | **NO CHANGE** ✅ |
-
-**Verdict:** ✅ **EffectOne SDK works with ANY streaming provider.** You keep all creative tools.
-
-### **3. E-commerce & Custom Features**
+### **4. E-commerce & Custom Features**
 
 | Feature | Current (with BytePlus) | With api.video | Change |
 |---------|------------------------|----------------|---------|
@@ -137,13 +123,6 @@ api.video Platform (Streaming Infrastructure)
 
 ## What Happens If You Switch to api.video?
 
-### **You Would Keep (EVERYTHING):**
-- ✅ Live streaming infrastructure (RTMP push → api.video instead of MediaLive)
-- ✅ HLS playback for viewers
-- ✅ Recording & DVR
-- ✅ Your custom e-commerce implementation
-- ✅ Your custom UI/UX
-- ✅ **ALL BytePlus EffectOne SDK features** (filters, beauty AR, stickers, editor, drafts)
 
 ### **What Actually Changes:**
 - ⚠️ Streaming backend only: BytePlus MediaLive → api.video
@@ -170,50 +149,6 @@ api.video Platform (Streaming Infrastructure)
 
 ---
 
-## Cost Analysis
-
-### **Current Setup:**
-```
-BytePlus MediaLive (Streaming Infrastructure):
-- RTMP/WebRTC streaming: ~$200-500/month (estimate based on usage)
-
-BytePlus EffectOne SDK (Creative Tools - SEPARATE):
-- License: ~$500-1000/year (expires 2025-12-31)  
-- Works with ANY streaming provider ✅
-- Renewal needed
-
-Total: ~$250-600/month
-```
-
-### **With api.video:**
-```
-api.video (Streaming Infrastructure):
-- Developer: $50/month (testing)
-- Starter: $99/month (small scale)
-- Growth: $299/month (medium scale)
-- Enterprise: Custom pricing (large scale)
-
-BytePlus EffectOne SDK (KEEPS WORKING):
-- License: ~$500-1000/year (same as before)
-- No changes needed ✅
-
-Total: ~$150-350/month (estimated - need quote for your traffic)
-```
-
-### **Cost Comparison:**
-
-| Component | Current (BytePlus) | With api.video | Savings |
-|-----------|-------------------|----------------|---------|
-| **Streaming Infrastructure** | $200-500/month | $50-300/month | 💰 $100-200/month |
-| **EffectOne SDK** | ~$42-83/month | ~$42-83/month | No change |
-| **Custom Implementation** | Included | Included | No change |
-| **TOTAL** | $250-600/month | $100-400/month | 💰 **~40-60% savings** |
-
-**Verdict:** ✅ **Significant cost savings possible** while keeping ALL features
-
----
-
-## Why This Comparison Makes Sense
 
 ### **Fair Infrastructure-Only Comparison:**
 
@@ -813,5 +748,6 @@ BOTH work with:
 **Prepared by:** Yerins Abraham
 **Date:** January 2, 2026  
 **For:** LykLuk CEO - Fair Infrastructure-Only Comparison
+
 
 
