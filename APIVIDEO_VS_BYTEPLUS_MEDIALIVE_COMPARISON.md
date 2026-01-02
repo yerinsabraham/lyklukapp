@@ -17,7 +17,7 @@
 **Key Points:**
 1. ✅ **Fair comparison** - Both are streaming infrastructure only
 2. ✅ **ALL features preserved** - EffectOne SDK + custom e-commerce work with EITHER
-3. 💰 **40-60% cost savings** - Estimated $100-200/month savings
+3. 💰 **Cost savings** - Monthly savings
 4. ✅ **Better Flutter support** - Native SDK vs. manual RTMP integration
 5. ✅ **SRT protocol** - Better for unstable mobile networks
 6. ⚠️ **HLS only** - No WebRTC fallback (check if acceptable)
@@ -840,3 +840,4 @@ BOTH work with:
 **Prepared by:** Yerins Abraham
 **Date:** January 2, 2026  
 **For:** LykLuk CEO - Fair Infrastructure-Only Comparison
+
