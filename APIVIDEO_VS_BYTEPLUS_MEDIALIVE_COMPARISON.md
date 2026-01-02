@@ -24,13 +24,11 @@
 7. ⚠️ **Shorter DVR** - 1hr window vs. unlimited on BytePlus
 8. ⚠️ **Need verification** - Get actual pricing quote for your traffic
 
-**Note:** EffectOne SDK (creative tools) is INDEPENDENT and works with EITHER streaming provider.
-
 ---
 
-## What You Currently Have
+## What We Currently Have
 
-### **Your Complete Stack:**
+### **Our Complete Stack:**
 ```
 Current Implementation (3 Components)
 │
@@ -58,8 +56,6 @@ Current Implementation (3 Components)
     └── Portable to any streaming provider ✅
 ```
 
-**Current Cost:** ~$200-500/month (MediaLive streaming only)
-
 ---
 
 ## What api.video Offers
@@ -77,7 +73,7 @@ api.video Platform (Streaming Infrastructure)
     ├── Simple API
     └── Native Flutter SDK ⭐
     
-✅ Your Custom Implementation - WORKS THE SAME
+✅ Our Custom Implementation - WORKS THE SAME
 ├── E-commerce Integration
 ├── Store Management  
 ├── Product Cards
@@ -90,29 +86,6 @@ api.video Platform (Streaming Infrastructure)
 ├── Video Editor
 └── All creative tools remain
 ```
-
-**Cost:** Estimated $150-400/month (need actual quote)
-
----
-
-## Critical Comparison
-
-**⚠️ IMPORTANT: EffectOne SDK is INDEPENDENT of streaming infrastructure**
-
-| Component | Your Current Setup | With api.video | What Changes |
-|-----------|-------------------|----------------|--------------|
-| **Live Streaming Infrastructure** | BytePlus MediaLive | api.video | ⚠️ **COMPARING THIS** |
-| **Filters & Effects** | EffectOne SDK | EffectOne SDK | ✅ **NO CHANGE** |
-| **Beauty AR** | EffectOne SDK | EffectOne SDK | ✅ **NO CHANGE** |
-| **Video Editor** | EffectOne SDK | EffectOne SDK | ✅ **NO CHANGE** |
-| **Stickers & Animations** | EffectOne SDK | EffectOne SDK | ✅ **NO CHANGE** |
-| **Draft System** | EffectOne SDK | EffectOne SDK | ✅ **NO CHANGE** |
-| **E-commerce Integration** | Your Custom Code | Your Custom Code | ✅ **NO CHANGE** |
-| **Custom UI/UX** | Your Custom Code | Your Custom Code | ✅ **NO CHANGE** |
-
-### **Score:**
-- **Only Streaming Infrastructure Changes** - Everything else stays the same ✅
-- **Features You'd Lose:** NONE (EffectOne SDK works with any streaming provider)
 
 ---
 
@@ -840,4 +813,5 @@ BOTH work with:
 **Prepared by:** Yerins Abraham
 **Date:** January 2, 2026  
 **For:** LykLuk CEO - Fair Infrastructure-Only Comparison
+
 
