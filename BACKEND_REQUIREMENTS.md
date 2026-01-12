@@ -2,7 +2,7 @@
 
 **Date:** January 12, 2026  
 **Priority:** HIGH  
-**Estimated Backend Effort:** 14-19 days  
+**Estimated Backend Effort:** 
 **Blocking Issue:** `POST /subscription/activate` must be completed first
 
 ---
@@ -1362,3 +1362,4 @@ All endpoints should be documented using OpenAPI/Swagger:
 **Backend Questions:** Submit via Slack #backend-dev or create GitHub issue
 
 **Next Meeting:** Review backend estimates and timeline
+
