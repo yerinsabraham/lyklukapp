@@ -10,8 +10,6 @@
 ## 🚨 CRITICAL - Phase 2 Blocker
 
 ### Endpoint: `POST /subscription/activate`
-**Priority:** 🔴 **URGENT** - Blocks ALL Phase 3 work  
-**Estimated Effort:** 1 day
 
 #### Purpose:
 Activate a user's subscription after successful payment verification.
@@ -123,10 +121,6 @@ CREATE TABLE subscription_invoices (
 ---
 
 ## 1️⃣ Ads Management System
-
-**Priority:** 🟡 MEDIUM  
-**Estimated Effort:** 3-4 days  
-**Endpoints:** 8
 
 ### 1.1 Create Ad
 ```
@@ -364,7 +358,6 @@ Logic:
 ## 2️⃣ Geographic Restrictions
 
 **Priority:** 🔴 HIGH  
-**Estimated Effort:** 2-3 days  
 **Endpoints:** 2
 
 ### 2.1 Get Allowed Countries
@@ -709,7 +702,6 @@ async function resetMonthlyUsage() {
 ## 4️⃣ Advanced Payment Features
 
 **Priority:** 🟡 MEDIUM  
-**Estimated Effort:** 5-7 days  
 **Endpoints:** 12
 
 ### 4.1 Promo Code Validation
@@ -1358,6 +1350,7 @@ All endpoints should be documented using OpenAPI/Swagger:
 
 
 **Frontend Lead:** Yerins Abraham
+
 
 
 
