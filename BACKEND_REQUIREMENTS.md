@@ -1,4 +1,4 @@
-# Backend Requirements for Phase 3 - Subscription System
+# Backend Requirements - Subscription System
 
 **Date:** January 12, 2026  
 **Priority:** HIGH  
@@ -1356,10 +1356,8 @@ All endpoints should be documented using OpenAPI/Swagger:
 
 ---
 
-## 📞 Contact
 
-**Frontend Lead:** [Your Name]  
-**Backend Questions:** Submit via Slack #backend-dev or create GitHub issue
+**Frontend Lead:** Yerins Abraham
 
-**Next Meeting:** Review backend estimates and timeline
+
 
