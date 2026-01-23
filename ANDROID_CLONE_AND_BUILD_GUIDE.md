@@ -1,441 +1,504 @@
-# Deep Link Website Setup for lykluk.com
+# Android Clone & Build Guide for LykLuk
 
-This guide provides complete instructions for configuring your `lykluk.com` website to support Universal Links (iOS) and App Links (Android) for the Lykluk mobile app.
+**Quick Start Guide for Developers Cloning This Repo**
 
----
-
-## Overview
-
-Deep links allow users to:
-- **Share video links** (`https://lykluk.com/watch/{uuid}`) that open directly in the app
-- **Share profile links** (`https://lykluk.com/u/@username`) that open directly in the app
-
-When a user clicks these links:
-1. If the app is installed → Opens the app directly to the video/profile
-2. If the app is NOT installed → Opens the website (you can redirect to App Store/Play Store)
+Last Updated: January 23, 2026
 
 ---
 
-## Part 1: iOS Universal Links Setup
+## 📋 Prerequisites Checklist
 
-### Step 1: Create the Apple App Site Association (AASA) File
+Before cloning, ensure you have these installed:
 
-Create a file named `apple-app-site-association` (no file extension) with this exact content:
+| Requirement | Version | Command to Check |
+|------------|---------|------------------|
+| **Flutter** | 3.38.x (stable) | `flutter --version` |
+| **Java/JDK** | 17 or 21 LTS | `java --version` |
+| **Android Studio** | Latest (2024.x+) | Check in About |
+| **Android SDK** | Platform 35-36 | SDK Manager |
+| **Android NDK** | 27.0.12077973 | SDK Manager |
+| **Git** | 2.x+ | `git --version` |
 
-```json
-{
-  "applinks": {
-    "apps": [],
-    "details": [
-      {
-        "appID": "TEAM_ID.com.lykluk.app",
-        "paths": [
-          "/u/*",
-          "/watch/*"
-        ]
-      }
-    ]
-  }
-}
-```
+### Quick Install Commands (if missing):
 
-### Step 2: Find Your Apple Team ID
-
-1. Go to [Apple Developer Portal](https://developer.apple.com/account)
-2. Sign in with your Apple Developer account
-3. Click on **Membership** in the left sidebar
-4. Your **Team ID** is displayed (10-character alphanumeric string, e.g., `ABC123DEF4`)
-
-### Step 3: Update the AASA File
-
-Replace `TEAM_ID` in the file with your actual Team ID:
-
-```json
-{
-  "applinks": {
-    "apps": [],
-    "details": [
-      {
-        "appID": "ABC123DEF4.com.lykluk.app",
-        "paths": [
-          "/u/*",
-          "/watch/*"
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Step 4: Host the AASA File
-
-Upload the file to your web server at **one of these locations**:
-
-**Option A (Recommended):**
-```
-https://lykluk.com/.well-known/apple-app-site-association
-```
-
-**Option B (Alternative):**
-```
-https://lykluk.com/apple-app-site-association
-```
-
-### Step 5: Configure Web Server Headers
-
-The file MUST be served with specific headers. Configure your web server:
-
-#### For Nginx:
-```nginx
-location /.well-known/apple-app-site-association {
-    default_type application/json;
-    add_header Content-Type application/json;
-}
-```
-
-#### For Apache (.htaccess):
-```apache
-<Files "apple-app-site-association">
-    Header set Content-Type "application/json"
-</Files>
-```
-
-#### For Vercel (vercel.json):
-```json
-{
-  "headers": [
-    {
-      "source": "/.well-known/apple-app-site-association",
-      "headers": [
-        { "key": "Content-Type", "value": "application/json" }
-      ]
-    }
-  ]
-}
-```
-
-#### For Firebase Hosting (firebase.json):
-```json
-{
-  "hosting": {
-    "headers": [
-      {
-        "source": "/.well-known/apple-app-site-association",
-        "headers": [
-          { "key": "Content-Type", "value": "application/json" }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Step 6: AASA File Requirements Checklist
-
-- [ ] File is named exactly `apple-app-site-association` (no `.json` extension)
-- [ ] File is in the `/.well-known/` directory
-- [ ] Served over HTTPS (not HTTP)
-- [ ] Content-Type header is `application/json`
-- [ ] No redirects when accessing the URL
-- [ ] File is publicly accessible (no authentication required)
-- [ ] Valid JSON format (no syntax errors)
-
----
-
-## Part 2: Android App Links Setup
-
-### Step 1: Create the Asset Links File
-
-Create a file named `assetlinks.json` with this content:
-
-```json
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.lykluk.lykluk",
-      "sha256_cert_fingerprints": [
-        "YOUR_SHA256_FINGERPRINT_HERE"
-      ]
-    }
-  }
-]
-```
-
-### Step 2: Get Your SHA256 Certificate Fingerprint
-
-#### For Debug/Development:
 ```bash
-keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+# Install Flutter (using FVM - recommended)
+dart pub global activate fvm
+fvm install 3.38.7
+
+# Install Java 21 (Windows)
+# Download from: https://adoptium.net/temurin/releases/
+# Or use Chocolatey: choco install openjdk21
+
+# Install Android Studio
+# Download from: https://developer.android.com/studio
 ```
 
-#### For Release/Production:
+---
+
+## 🚀 Step-by-Step Build Instructions
+
+### Step 1: Clone the Repository
+
 ```bash
-keytool -list -v -keystore /path/to/your/release-keystore.jks -alias your-key-alias
+# Clone the repo
+git clone https://github.com/lyklukdigital/mobile_app_v2.git
+cd mobile_app_v2
+
+# Checkout the correct branch
+git checkout mvp-official
 ```
 
-Look for the line that says `SHA256:` and copy the fingerprint (format: `AA:BB:CC:DD:...`)
+### Step 2: Verify Critical Files Exist
 
-### Step 3: Update the Asset Links File
+**Check these files are present (they should be in version control):**
 
-Replace `YOUR_SHA256_FINGERPRINT_HERE` with your actual fingerprint:
+```bash
+# Firebase config (REQUIRED)
+android/app/google-services.json ✅
 
-```json
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.lykluk.lykluk",
-      "sha256_cert_fingerprints": [
-        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
-      ]
-    }
-  }
-]
+# BytePlus license (REQUIRED)
+android/app/src/main/assets/License/lykluk_test_20251027_20260131_com.lykluk.lykluk_1.8.0_493.licbag ✅
+
+# Gradle properties with BytePlus credentials (REQUIRED)
+android/gradle.properties ✅
 ```
 
-**Note:** For production, you may need BOTH debug and release fingerprints:
+**If any are missing, STOP and contact the team.**
 
-```json
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.lykluk.lykluk",
-      "sha256_cert_fingerprints": [
-        "DEBUG_SHA256_FINGERPRINT",
-        "RELEASE_SHA256_FINGERPRINT"
-      ]
-    }
-  }
-]
+### Step 3: Install Flutter Dependencies
+
+```bash
+# Get all Flutter packages
+flutter pub get
+
+# This should complete without errors
+# If you see errors, check your Flutter version first
 ```
 
-### Step 4: Host the Asset Links File
+### Step 4: Configure Android SDK & NDK
 
-Upload the file to your web server at:
+Open Android Studio → SDK Manager and install:
+
 ```
-https://lykluk.com/.well-known/assetlinks.json
-```
-
-### Step 5: Configure Web Server Headers
-
-#### For Nginx:
-```nginx
-location /.well-known/assetlinks.json {
-    default_type application/json;
-    add_header Content-Type application/json;
-}
+✅ Android SDK Platform 36 (API 36)
+✅ Android SDK Platform 35 (API 35)  
+✅ Android SDK Build-Tools 36.0.0
+✅ Android NDK 27.0.12077973 (EXACT version - important!)
+✅ Android SDK Command-line Tools
 ```
 
-#### For Vercel (vercel.json):
-```json
-{
-  "headers": [
-    {
-      "source": "/.well-known/assetlinks.json",
-      "headers": [
-        { "key": "Content-Type", "value": "application/json" }
-      ]
-    }
-  ]
-}
+**Set Environment Variables (Windows):**
+
+```powershell
+# Add to System Environment Variables
+ANDROID_HOME=C:\Users\<YourUsername>\AppData\Local\Android\Sdk
+ANDROID_NDK_HOME=%ANDROID_HOME%\ndk\27.0.12077973
+
+# Add to PATH
+%ANDROID_HOME%\platform-tools
+%ANDROID_HOME%\cmdline-tools\latest\bin
+```
+
+**Verify NDK Installation:**
+
+```bash
+# Should show path to NDK
+echo $env:ANDROID_NDK_HOME
+
+# Should exist
+ls $env:ANDROID_HOME\ndk\27.0.12077973
+```
+
+### Step 5: Verify BytePlus Credentials
+
+Check `android/gradle.properties` contains:
+
+```properties
+# BytePlus SDK credentials (should already be there)
+username=android_texas_test
+password=dVl90zD5G5KUotUz
+```
+
+**These are already in the repo - do NOT change them.**
+
+### Step 6: Build Debug APK (First Test)
+
+```bash
+# Clean build
+flutter clean
+
+# Build debug APK (no signing required)
+flutter build apk --debug
+
+# Expected output:
+# ✓ Built build/app/outputs/flutter-apk/app-debug.apk
+```
+
+**If this fails, see [Troubleshooting](#troubleshooting) section below.**
+
+### Step 7: Run on Physical Device or Emulator
+
+```bash
+# Connect your Android phone via USB with USB debugging enabled
+# OR start an Android emulator
+
+# List available devices
+flutter devices
+
+# Run the app
+flutter run
+
+# Or run in release mode (requires signing - see Step 8)
+flutter run --release
+```
+
+### Step 8: Release Build Setup (Optional)
+
+**For debug builds, SKIP THIS.**
+
+For release builds, you need a signing key. The team should provide:
+
+1. `key.properties` file → Place in `android/` folder
+2. Keystore file (`.jks` or `.keystore`) → Place where `key.properties` references it
+
+**Example `key.properties`:**
+```properties
+storePassword=<provided-by-team>
+keyPassword=<provided-by-team>
+keyAlias=<provided-by-team>
+storeFile=<path-to-keystore>
+```
+
+**Then build release:**
+```bash
+flutter build apk --release
+# OR
+flutter build appbundle --release
 ```
 
 ---
 
-## Part 3: Complete .well-known Directory Setup
+## 🔧 Troubleshooting
 
-Your `/.well-known/` directory should contain:
+### Error 1: "Failed to download BytePlus SDK"
 
+**Symptoms:**
 ```
-lykluk.com/
-└── .well-known/
-    ├── apple-app-site-association    (iOS)
-    └── assetlinks.json               (Android)
+Could not resolve com.bytedance.ies.effectone:effect-sdk-base:1.8.0.493
+```
+
+**Solution:**
+```bash
+# 1. Verify gradle.properties has BytePlus credentials
+cat android/gradle.properties | grep username
+
+# 2. Clear Gradle cache
+cd android
+./gradlew clean --refresh-dependencies
+cd ..
+
+# 3. Rebuild
+flutter clean
+flutter pub get
+flutter build apk --debug
+```
+
+### Error 2: "NDK not configured"
+
+**Symptoms:**
+```
+No version of NDK matched the requested version
+```
+
+**Solution:**
+```bash
+# Install EXACT NDK version via Android Studio SDK Manager
+# OR via command line:
+sdkmanager "ndk;27.0.12077973"
+
+# Verify installation
+ls $env:ANDROID_HOME\ndk\27.0.12077973
+```
+
+### Error 3: "Java version mismatch"
+
+**Symptoms:**
+```
+Android Gradle plugin requires Java 17 to run
+```
+
+**Solution:**
+```bash
+# Check current Java version
+java --version
+
+# If wrong version, install Java 21 from:
+# https://adoptium.net/temurin/releases/
+
+# Set JAVA_HOME (Windows - System Environment Variables)
+JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.x.x
+
+# Restart terminal and verify
+java --version
+```
+
+### Error 4: "Gradle sync failed"
+
+**Symptoms:**
+```
+Could not resolve all dependencies
+```
+
+**Solution:**
+```powershell
+# Clear all Gradle caches
+cd android
+./gradlew clean
+Remove-Item -Recurse -Force ~/.gradle/caches/
+cd ..
+
+# Clean Flutter
+flutter clean
+flutter pub get
+
+# Try again
+flutter build apk --debug
+```
+
+### Error 5: "License not found or invalid"
+
+**Symptoms:**
+```
+BytePlus license error / License validation failed
+```
+
+**Solution:**
+```bash
+# Verify license file exists
+ls android/app/src/main/assets/License/
+
+# Should show:
+# lykluk_test_20251027_20260131_com.lykluk.lykluk_1.8.0_493.licbag
+
+# If missing, contact team for license file
+# License expires: January 31, 2026
+```
+
+### Error 6: "Out of memory / Build timeout"
+
+**Symptoms:**
+```
+GC overhead limit exceeded
+Gradle build daemon disappeared unexpectedly
+```
+
+**Solution:**
+```bash
+# Increase Gradle memory in android/gradle.properties
+# Should already have:
+org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=4G -XX:ReservedCodeCacheSize=512m
+
+# If build still fails, close Android Studio and other apps
+# Then retry
+```
+
+### Error 7: "google-services.json not found"
+
+**Symptoms:**
+```
+File google-services.json is missing
+```
+
+**Solution:**
+```bash
+# This file SHOULD be in the repo
+# Verify it exists:
+ls android/app/google-services.json
+
+# If missing, contact team immediately
+# App cannot run without Firebase config
+```
+
+### Error 8: "Execution failed for task :app:mergeDebugNativeLibs"
+
+**Symptoms:**
+```
+Error while merging native libraries
+```
+
+**Solution:**
+```bash
+# This is usually NDK version mismatch
+# Ensure EXACT version: 27.0.12077973
+
+# Check android/build.gradle.kts has:
+ndkVersion = "27.0.12077973"
+
+# Reinstall NDK if needed
+sdkmanager --uninstall "ndk;27.0.12077973"
+sdkmanager "ndk;27.0.12077973"
 ```
 
 ---
 
-## Part 4: Web Page Fallback (Optional but Recommended)
+## ✅ Verification Checklist
 
-When users without the app click deep links, they should see a useful page. Create these routes on your website:
+After setup, verify everything works:
 
-### Video Page (`/watch/{uuid}`)
+```bash
+# 1. Check Flutter environment
+flutter doctor -v
+# Should show all green checkmarks for Android
 
-Create a page at `https://lykluk.com/watch/[uuid]` that:
-1. Shows video information (thumbnail, title, description)
-2. Includes App Store / Play Store download buttons
-3. Has Open Graph meta tags for social sharing
+# 2. Check Gradle versions
+cd android
+./gradlew --version
+cd ..
+# Should show Gradle 8.13
 
-Example meta tags:
-```html
-<meta property="og:title" content="Watch this video on Lykluk">
-<meta property="og:description" content="Download Lykluk to watch this video">
-<meta property="og:image" content="https://lykluk.com/video-thumbnail.jpg">
-<meta property="og:url" content="https://lykluk.com/watch/uuid-here">
-<meta property="og:type" content="video.other">
+# 3. List devices
+flutter devices
+# Should show your connected device or emulator
+
+# 4. Build debug (should succeed)
+flutter build apk --debug
+# Should complete in 3-10 minutes on first build
+
+# 5. Run app
+flutter run
+# App should launch and show login screen
 ```
 
-### Profile Page (`/u/{username}`)
+**Expected First Build Time:**
+- **First build:** 5-10 minutes (downloading dependencies)
+- **Subsequent builds:** 1-3 minutes
 
-Create a page at `https://lykluk.com/u/[username]` that:
-1. Shows user profile information
-2. Includes App Store / Play Store download buttons
-3. Has Open Graph meta tags for social sharing
+---
 
-Example meta tags:
-```html
-<meta property="og:title" content="@username on Lykluk">
-<meta property="og:description" content="Check out @username's profile on Lykluk">
-<meta property="og:image" content="https://lykluk.com/user-avatar.jpg">
-<meta property="og:url" content="https://lykluk.com/u/username">
-<meta property="og:type" content="profile">
+## 🎯 Quick Build Commands Reference
+
+```bash
+# DEBUG BUILD (no signing needed)
+flutter build apk --debug
+flutter run --debug
+
+# RELEASE BUILD (requires signing key)
+flutter build apk --release
+flutter build appbundle --release
+
+# CLEAN BUILD (when errors occur)
+flutter clean
+flutter pub get
+flutter build apk --debug
+
+# GRADLE CLEAN (deeper clean)
+cd android
+./gradlew clean --refresh-dependencies
+cd ..
 ```
 
 ---
 
-## Part 5: Testing & Validation
+## 📱 Testing on Your Device
 
-### Test iOS Universal Links
+### Enable USB Debugging (Android Phone)
 
-1. **Apple's Validation Tool:**
-   ```
-   https://search.developer.apple.com/appsearch-validation-tool/
-   ```
-   Enter: `https://lykluk.com`
+1. Go to **Settings → About Phone**
+2. Tap **Build Number** 7 times (enables Developer Options)
+3. Go to **Settings → Developer Options**
+4. Enable **USB Debugging**
+5. Connect phone via USB
+6. Approve the "Allow USB Debugging?" prompt on phone
 
-2. **Direct URL Test:**
-   Open in browser and verify valid JSON:
-   ```
-   https://lykluk.com/.well-known/apple-app-site-association
-   ```
+### Verify Connection
 
-3. **On-Device Test:**
-   - Install the app on an iOS device
-   - Send yourself a link via Messages or Notes: `https://lykluk.com/watch/test-uuid`
-   - Long-press the link - you should see "Open in Lykluk" option
-   - Tap the link - should open the app directly
+```bash
+# Should show your device
+flutter devices
 
-### Test Android App Links
+# Should show device name and ID
+adb devices
+```
 
-1. **Google's Validation Tool:**
-   ```
-   https://developers.google.com/digital-asset-links/tools/generator
-   ```
+---
 
-2. **Direct URL Test:**
-   Open in browser and verify valid JSON:
-   ```
-   https://lykluk.com/.well-known/assetlinks.json
-   ```
+## 🔍 Expected Build Output
 
-3. **ADB Verification (on connected device):**
+**Successful Debug Build:**
+```
+Running Gradle task 'assembleDebug'...
+✓ Built build/app/outputs/flutter-apk/app-debug.apk (123.4MB)
+```
+
+**Successful App Launch:**
+```
+Launching lib/main.dart on <device> in debug mode...
+Running Gradle task 'assembleDebug'...
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+Installing build/app/outputs/flutter-apk/app-debug.apk...
+Debug service listening on ws://127.0.0.1:xxxxx
+Synced 0.0MB
+```
+
+---
+
+## 🆘 Still Having Issues?
+
+If you still can't build after following this guide:
+
+1. **Run diagnostic:**
    ```bash
-   adb shell pm get-app-links com.lykluk.lykluk
+   flutter doctor -v > flutter_doctor_output.txt
    ```
 
-4. **On-Device Test:**
-   - Install the app on an Android device
-   - Open a link in Chrome: `https://lykluk.com/watch/test-uuid`
-   - Should open the app directly (or show app chooser)
+2. **Check exact error:**
+   ```bash
+   flutter build apk --debug --verbose > build_output.txt 2>&1
+   ```
+
+3. **Share these files with the team:**
+   - `flutter_doctor_output.txt`
+   - `build_output.txt`
+   - Your OS version
+   - Your Android Studio version
+
+4. **Common quick fixes:**
+   ```bash
+   # Nuclear option - clean everything
+   flutter clean
+   cd android
+   ./gradlew clean
+   rm -rf .gradle
+   rm -rf ~/.gradle/caches
+   cd ..
+   flutter pub get
+   flutter build apk --debug
+   ```
 
 ---
 
-## Part 6: Troubleshooting
+## 📚 Additional Resources
 
-### iOS Issues
-
-| Problem | Solution |
-|---------|----------|
-| Links open in Safari | Check AASA file is valid JSON, no redirects, correct Team ID |
-| "Open in App" not appearing | Reinstall app, check entitlements match AASA |
-| Works in dev, not production | Verify production Team ID and bundle ID |
-
-### Android Issues
-
-| Problem | Solution |
-|---------|----------|
-| Links open in browser | Verify SHA256 fingerprint matches your signing key |
-| App chooser appears | assetlinks.json may have wrong package name |
-| Works in debug, not release | Add release keystore fingerprint to assetlinks.json |
-
-### Common Issues
-
-| Problem | Solution |
-|---------|----------|
-| 404 on .well-known files | Create the `.well-known` directory, check file permissions |
-| Wrong Content-Type | Configure server to serve as `application/json` |
-| Redirects breaking links | Serve files directly without any redirects |
+- **Full Setup Guide:** [docs/PROJECT_SETUP_GUIDE.md](docs/PROJECT_SETUP_GUIDE.md)
+- **Release Signing:** [docs/ANDROID_RELEASE_SIGNING.md](docs/ANDROID_RELEASE_SIGNING.md)
+- **BytePlus Integration:** [docs/ANDROID_BYTEPLUS_FILTER_INTEGRATION_GUIDE.md](docs/ANDROID_BYTEPLUS_FILTER_INTEGRATION_GUIDE.md)
+- **Copilot Instructions:** [.github/copilot-instructions.md](.github/copilot-instructions.md)
 
 ---
 
-## Quick Reference: Final File Contents
+## 🎉 Success Criteria
 
-### `/.well-known/apple-app-site-association`
-```json
-{
-  "applinks": {
-    "apps": [],
-    "details": [
-      {
-        "appID": "YOUR_TEAM_ID.com.lykluk.app",
-        "paths": ["/u/*", "/watch/*"]
-      }
-    ]
-  }
-}
-```
+You're ready to develop when:
 
-### `/.well-known/assetlinks.json`
-```json
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.lykluk.lykluk",
-      "sha256_cert_fingerprints": ["YOUR_SHA256_FINGERPRINT"]
-    }
-  }
-]
-```
+- ✅ `flutter doctor` shows no errors for Android
+- ✅ `flutter build apk --debug` completes successfully
+- ✅ `flutter run` launches the app on your device/emulator
+- ✅ App shows login screen without crashes
+- ✅ You can record a video using the camera (BytePlus SDK working)
 
 ---
 
-## Checklist Summary
+**Questions?** Contact the LykLuk development team.
 
-### iOS Setup
-- [ ] Created `apple-app-site-association` file
-- [ ] Replaced `TEAM_ID` with actual Apple Team ID
-- [ ] Uploaded to `/.well-known/` directory
-- [ ] Configured Content-Type header
-- [ ] Tested with Apple validation tool
-- [ ] Tested on real iOS device
-
-### Android Setup
-- [ ] Created `assetlinks.json` file
-- [ ] Got SHA256 fingerprint from keystore
-- [ ] Added both debug and release fingerprints (if needed)
-- [ ] Uploaded to `/.well-known/` directory
-- [ ] Configured Content-Type header
-- [ ] Tested with Google validation tool
-- [ ] Tested on real Android device
-
-### Web Fallback (Optional)
-- [ ] Created `/watch/[uuid]` page with app download links
-- [ ] Created `/u/[username]` page with app download links
-- [ ] Added Open Graph meta tags for social sharing
-
----
-
-## Support Links
-
-- [Apple Universal Links Documentation](https://developer.apple.com/documentation/xcode/supporting-universal-links-in-your-app)
-- [Android App Links Documentation](https://developer.android.com/training/app-links)
-- [Apple AASA Validator](https://search.developer.apple.com/appsearch-validation-tool/)
-- [Google Asset Links Tool](https://developers.google.com/digital-asset-links/tools/generator)
-
+**License Expiry:** BytePlus license expires **January 31, 2026** - contact team for renewal if building after this date.
