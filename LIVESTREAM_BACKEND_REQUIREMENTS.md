@@ -2,27 +2,35 @@
 
 This document outlines the backend requirements for the livestream feature based on frontend analysis.
 
+**✅ UPDATE (Jan 25, 2026):** Frontend models have been updated to handle backend field mappings automatically.
+
 ---
 
 ## 1. Stream Details API (`GET /live-streams/{streamId}`)
 
-### Required Response Fields
+### Backend Response (Current)
 
-The frontend expects these fields in the `LiveStreamModel`:
+The backend returns this structure which is now correctly mapped by the frontend:
 
 ```json
 {
   "success": true,
   "data": {
     "id": "stream-uuid",
-    "creatorId": "username123",        // ⚠️ MUST be username (used for follow API & navigation)
-    "creatorName": "Display Name",     // ⚠️ MUST be populated (shown in UI, "Unknown" if null)
-    "creatorAvatar": "profile/avatar.jpg",  // Relative path (will prepend https://cdn.lykluk.com/)
+    "userId": 109,                          // ✅ Mapped to creatorId
+    "user": {
+      "id": 109,
+      "username": "@yashwardhan7057875",    // ✅ Mapped to creatorId & creatorName
+      "verified_profile": false,
+      "profile": {
+        "avatar": "default/profile/default1.jpeg"  // ✅ Mapped to creatorAvatar
+      }
+    },
     "title": "Stream Title",
     "description": "Stream description",
-    "status": "LIVE",                  // LIVE, ENDED, SCHEDULED, etc.
-    "streamType": "SOCIAL",            // SOCIAL, COMMERCE, PODCAST, EVENT, MASTERCLASS
-    "monetizationType": "free",        // free, paid, subscription
+    "status": "LIVE",                       // ✅ LIVE, ENDED, SCHEDULED mapped
+    "streamType": "SOCIAL",
+    "monetizationType": "FREE",             // ✅ FREE, PAID mapped
     "currentViewers": 5,
     "totalViews": 100,
     "totalLikes": 50,
@@ -32,13 +40,16 @@ The frontend expects these fields in the `LiveStreamModel`:
 }
 ```
 
-### ⚠️ Critical Fields
+### ✅ Field Mapping (Frontend handles this automatically)
 
-| Field | Requirement | Used For |
-|-------|-------------|----------|
-| `creatorId` | **MUST be username** (not UUID) | Follow API, Profile navigation |
-| `creatorName` | **MUST be populated** | Display name in top bar |
-| `creatorAvatar` | Relative or full URL | Profile picture display |
+| Backend Field | Frontend Field | Status |
+|---------------|----------------|--------|
+| `user.username` | `creatorId` | ✅ Auto-mapped |
+| `user.username` | `creatorName` | ✅ Auto-mapped |
+| `user.profile.avatar` | `creatorAvatar` | ✅ Auto-mapped |
+| `userId` (fallback) | `creatorId` | ✅ Auto-mapped |
+| `status` (uppercase) | `status` (enum) | ✅ Auto-mapped |
+| `monetizationType` (uppercase) | `monetizationType` (enum) | ✅ Auto-mapped |
 
 ---
 
@@ -181,23 +192,25 @@ profileRepo.followUnfollow(userName: stream.creatorId)
 
 ## Summary of Issues to Fix
 
-### Backend Fixes Needed
+### ✅ Resolved (Frontend Updated)
+
+1. **Creator Name/ID/Avatar Mapping**: 
+   - Frontend now extracts from `user.username` and `user.profile.avatar`
+   - No backend changes needed
+
+2. **Comment User Info**:
+   - Frontend now handles nested `user` object in comments
+   - Also handles `user.profile.avatar` for avatars
+
+3. **Viewer Info**:
+   - Frontend now handles nested `user` object
+
+### ⚠️ Backend Fixes Still Needed
 
 1. **Comment Broadcasting**: 
    - Ensure `comment` events are broadcast to **ALL** participants in the stream room, including the broadcaster
 
-2. **Creator Name**:
-   - Return `creatorName` field populated in stream details API
-   - Currently showing "Unknown" because this field is null
-
-3. **Creator ID**:
-   - Ensure `creatorId` contains the **username** (not UUID) for follow API compatibility
-
-4. **User Avatar in Comments**:
-   - Include `userAvatar` field in comment events
-   - Can be relative path (frontend will prepend CDN URL)
-
-5. **Viewer Count**:
+2. **Viewer Count**:
    - Verify `viewerJoined`/`viewerLeft` events are being emitted
    - Include `viewerCount` in the event payload
 
