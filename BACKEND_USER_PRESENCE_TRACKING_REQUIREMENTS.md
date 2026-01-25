@@ -13,7 +13,7 @@ Implement a comprehensive user presence and activity tracking system to:
 
 ---
 
-## 🎯 Phase 1: User Presence System (HIGH PRIORITY)
+## 🎯 Phase 1: User Presence System
 
 ### 1.1 Database Changes
 
@@ -399,6 +399,7 @@ Response:
 4. **Rate limiting:**
    - Limit presence endpoint to 10 req/min per user
    - Debounce `last_active_at` updates (max 1/minute per user)
+
 
 
 
