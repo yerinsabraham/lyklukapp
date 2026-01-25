@@ -400,26 +400,8 @@ Response:
    - Limit presence endpoint to 10 req/min per user
    - Debounce `last_active_at` updates (max 1/minute per user)
 
----
 
-## 🔗 Related Docs
 
-- [Messaging Backend Requirements](MESSAGING_BACKEND_REQUIREMENTS.md)
-- [MediaLive Backend Integration](BACKEND_MEDIALIVE_REQUIREMENTS.md)
-- [Event-Driven Architecture](EVENT_DRIVEN_ARCHITECTURE.md)
 
----
-
-## ❓ Questions for Backend Team
-
-1. Do you prefer Redis or database for online user tracking?
-2. Should we implement heartbeat pings for mobile apps (to prevent stale online status)?
-3. What's your preference for activity log retention (30 days? 90 days?)?
-4. Should presence updates be sent to all followers or only active chat partners?
-
----
-
-**Frontend Team Contact:** Ready to test as soon as Phase 1 is deployed to staging!  
-**Estimated Frontend Integration Time:** 1-2 days (mostly just display logic)
 
 
